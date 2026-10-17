@@ -18,7 +18,7 @@ The node serves the loader with `Content-Security-Policy: sandbox allow-scripts 
 
 The hook does not replace the account signature. On attach, the family seed is sealed with the passkey's PRF output and stored as ciphertext in the loader. A later payment asks for the same passkey, opens the seed, and signs. Without PRF, the seed stays in this browser and the hook still requires the passkey.
 
-The stored origin has to be 8 to 64 characters. `http://127.0.0.1:8787` fits. A long tunnel hostname may not.
+The stored origin has to be https and 8 to 64 characters.
 
 ## Wallet
 
@@ -31,9 +31,7 @@ Push the repository to GitHub and turn on Pages (the `pages` workflow publishes 
 - **Lock the hook** (level 3) means a lost passkey locks the account. The seed cannot remove the hook. Leave it off for level 2: payments and account changes still need the phone, and `SetHook` can still remove the hook.
 - **Sign a transaction** builds a payment, trust line, offer, escrow, check, domain change, regular key, preauthorization, tickets, invoke, or account delete. Face ID signs it and the wallet submits it.
 
-The bootloader then lives at `https://pwa.passkey.xahau-dev.net/<account>`. A payment there comes back here. **Other transactions** opens the full form.
-
-`npm run serve` serves the same wallet at http://127.0.0.1:8787/signer.html for a desktop browser. An iPhone passkey has to be created on the https Pages origin.
+The bootloader then lives at `https://pwa.passkey.xahau-dev.net/<account>`. A payment there comes back here. **Other transactions** opens the full form. Open the wallet at https://shortthefomo.github.io/p-256-bootloader/.
 
 ## Levels
 

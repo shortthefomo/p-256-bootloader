@@ -41,10 +41,7 @@ function jsString(value) {
 
 export function renderBootloader({ signer, vault = "", cid = "", spk = "" }) {
   const url = new URL(signer);
-  if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("signer must be an http(s) URL");
-  if (url.protocol === "http:" && url.hostname !== "localhost" && url.hostname !== "127.0.0.1") {
-    throw new Error("a non-local signer has to be https so the iPhone can use a passkey");
-  }
+  if (url.protocol !== "https:") throw new Error("signer must be https");
   const origin = url.origin;
   if (origin.length < 8 || origin.length > 64) {
     throw new Error(`signer origin is ${origin.length} characters; the hook allows 8 to 64`);

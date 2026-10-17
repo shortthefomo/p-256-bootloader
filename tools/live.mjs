@@ -33,7 +33,7 @@ import { libraries, XrplDefinitions, binary, derive, sign } from "xrpl-accountli
 
 const RP_ID = "p256.local";
 const ORIGIN = "https://p256.local";
-const SIGNER = "http://127.0.0.1:8787/signer.html";
+const SIGNER = "https://shortthefomo.github.io/p-256-bootloader/";
 const api = { libraries, XrplDefinitions, binary, sign, derive };
 
 const results = [];

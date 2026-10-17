@@ -65,8 +65,8 @@ function say(parent, text, className = "muted") {
 
 function originOk() {
   const origin = location.origin;
-  if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
-    return "Open this signer on https. An iPhone will not create a passkey on plain http, except for localhost on the phone itself.";
+  if (location.protocol !== "https:") {
+    return "Open https://shortthefomo.github.io/p-256-bootloader/ in Safari. Face ID needs that https origin.";
   }
   if (origin.length < 8 || origin.length > 64) {
     return `This origin is ${origin.length} characters. The hook stores origins of 8 to 64 characters, and this one does not fit.`;

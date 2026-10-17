@@ -78,13 +78,13 @@ check("xah drops", xahToDrops("1.5") === 1500000n && dropsToXah(1500000n) === "1
 check("xah whole", dropsToXah(2000000n) === "2");
 
 const html = renderBootloader({
-  signer: "http://127.0.0.1:8787/signer.html",
+  signer: "https://shortthefomo.github.io/p-256-bootloader/",
   vault: bytesToHex(vault),
   cid: "aa".repeat(16),
 });
 const size = assertLoaderHtml(html);
 check("loader fits", size <= 4096, `${size} bytes`);
-check("loader names the signer", html.includes("http://127.0.0.1:8787/signer.html"));
+check("loader names the signer", html.includes("https://shortthefomo.github.io/p-256-bootloader/"));
 check("loader names the namespace", html.includes(NAMESPACE));
 check("loader has no script close inside the script", html.split("</script>").length === 2);
 

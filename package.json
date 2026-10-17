@@ -4,7 +4,6 @@
   "type": "module",
   "description": "On-ledger Xahau wallet. An iPhone passkey is required for every gated signature.",
   "scripts": {
-    "serve": "node tools/serve.mjs",
     "pages": "node tools/pages.mjs",
     "test": "node tools/selftest.mjs",
     "live": "node tools/live.mjs"
