@@ -85,16 +85,11 @@ const html = renderBootloader({
 const size = assertLoaderHtml(html);
 check("loader fits", size <= 4096, `${size} bytes`);
 check("loader names the signer", html.includes("https://shortthefomo.github.io/p-256-bootloader/"));
-check("loader names the namespace", html.includes(NAMESPACE));
-check("loader has no script close inside the script", html.split("</script>").length === 2);
-
-const script = html.slice(html.indexOf("<script>") + 8, html.lastIndexOf("</script>"));
-try {
-  new Function(script);
-  check("loader script parses", true);
-} catch (error) {
-  check("loader script parses", false, error.message);
-}
+check("loader loads the github stylesheet", html.includes("https://shortthefomo.github.io/p-256-bootloader/wallet.css"));
+check("loader loads the github script", html.includes("https://shortthefomo.github.io/p-256-bootloader/wallet.js"));
+check("loader keeps its style off the ledger", !html.includes("<style"));
+check("loader has one script tag", html.split("</script>").length === 2);
+check("wallet script names the namespace", readFileSync(new URL("../public/wallet.js", import.meta.url), "utf8").includes(NAMESPACE));
 
 let firewall = null;
 try {

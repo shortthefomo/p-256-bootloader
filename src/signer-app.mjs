@@ -421,6 +421,23 @@ async function approve({ account, back, make, needsPublicKey }) {
   });
 }
 
+async function republish(account, back) {
+  const loaded = await loadAccount(account);
+  const html = renderBootloader({
+    signer: `${location.origin}${location.pathname}`,
+    vault: loaded.vault,
+    cid: loaded.credentialId ? bytesToHex(loaded.credentialId) : "",
+    spk: loaded.spk,
+  });
+  const tx = accountSetLoaderTx(html);
+  await approve({
+    account,
+    back: back || pwaUrl(account),
+    needsPublicKey: true,
+    make: () => ({ summary: "Publish the wallet page", payment: null, tx }),
+  });
+}
+
 function composer({ account, back }) {
   const kindSelect = el("select");
   for (const kind of TX_KINDS) kindSelect.append(el("option", { value: kind.id }, [`${kind.label}`]));
@@ -440,7 +457,8 @@ function composer({ account, back }) {
   kindSelect.addEventListener("change", draw);
   draw();
   const review = el("button", {}, ["Review"]);
-  screen("New transaction", [el("p", { class: "mono" }, [account]), kindSelect, fields, review]);
+  const update = el("button", { class: "ghost", onclick: () => republish(account, back).catch((error) => rejected(account, back, error)) }, ["Update the wallet page"]);
+  screen("New transaction", [el("p", { class: "mono" }, [account]), kindSelect, fields, review, update]);
   review.addEventListener("click", () => {
     const values = Object.fromEntries([...inputs].map(([key, input]) => [key, input.value]));
     try {
@@ -475,6 +493,7 @@ function home() {
   lock.checked = true;
   const create = el("button", {}, ["Create a wallet and attach iPhone"]);
   const sign = el("button", { class: "ghost" }, ["Sign a transaction"]);
+  const update = el("button", { class: "ghost" }, ["Update the wallet page"]);
   const use = el("button", { class: "ghost" }, ["Attach iPhone to this seed"]);
   const bad = originOk();
   screen("Xahau wallet", [
@@ -487,6 +506,7 @@ function home() {
     el("p", { class: "muted" }, ["Sign with an account that already has this iPhone attached."]),
     account,
     sign,
+    update,
     el("p", { class: "muted" }, ["Or attach a passkey to a wallet you already have."]),
     seed,
     el("label", {}, [lock, el("span", {}, ["Lock the hook. A lost passkey cannot be replaced, and the seed cannot take the hook off."])]),
@@ -499,6 +519,15 @@ function home() {
       return;
     }
     composer({ account: text, back: safeReturn(params.get("return") || "", text) });
+  });
+  update.addEventListener("click", () => {
+    const text = account.value.trim();
+    if (!/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(text)) {
+      fail(new Error("enter the account address"));
+      return;
+    }
+    const back = safeReturn(params.get("return") || "", text) || pwaUrl(text);
+    republish(text, back).catch(fail);
   });
 
   create.addEventListener("click", async () => {
