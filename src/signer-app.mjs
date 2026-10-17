@@ -2,6 +2,7 @@ import { renderBootloader } from "./bootloader.mjs";
 import { TX_KINDS, transactionFromKind } from "./tx-forms.mjs";
 import {
   asciiHex,
+  base64url,
   bytesToHex,
   derToRaw,
   dropsToXah,
@@ -100,6 +101,31 @@ async function createPasskey(address, accountId, salt) {
   });
   if (!credential) throw new Error("no passkey was created");
   return credential;
+}
+
+function passkeyLabel(summary) {
+  const chars = [...String(summary || "Xahau transaction").replace(/\s+/g, " ").trim()];
+  const encode = new TextEncoder();
+  while (chars.length && encode.encode(chars.join("")).length > 64) chars.pop();
+  return chars.join("").trim() || "Xahau transaction";
+}
+
+// The system sheet titles itself with the website. The passkey name is the
+// transaction being approved, and it is put back to the account afterwards.
+async function labelPasskey(accountId, label) {
+  const signal = globalThis.PublicKeyCredential?.signalCurrentUserDetails;
+  if (typeof signal !== "function") return;
+  const text = passkeyLabel(label);
+  try {
+    await signal.call(globalThis.PublicKeyCredential, {
+      rpId: location.hostname,
+      userId: base64url(accountId),
+      name: text,
+      displayName: text,
+    });
+  } catch {
+    // The sheet still opens when the name cannot be updated.
+  }
 }
 
 async function getPasskey(challenge, salt, credentialId) {
@@ -330,7 +356,8 @@ async function approve({ account, back, summary, make, needsPublicKey }) {
     go,
   ]);
   const api = globalThis.XrplAccountLib;
-  const salt = await prfSalt(accountBytes(api, account));
+  const idBytes = accountBytes(api, account);
+  const salt = await prfSalt(idBytes);
   let seed = "";
   try {
     seed = await recallSeed(account);
@@ -349,7 +376,13 @@ async function approve({ account, back, summary, make, needsPublicKey }) {
     const challenge = made.payment
       ? await paymentChallenge(api, { sequence: prepared.Sequence, destination: made.payment.destination, drops: made.payment.drops })
       : await txChallenge(api, prepared, holder, definitions);
-    const assertion = await getPasskey(challenge, salt, loaded.credentialId);
+    await labelPasskey(idBytes, made.summary);
+    let assertion;
+    try {
+      assertion = await getPasskey(challenge, salt, loaded.credentialId);
+    } finally {
+      await labelPasskey(idBytes, account);
+    }
     if (!seed) seed = await unlockSeed(account, assertion, loaded.vault);
     const wallet = walletFromSeed(seed);
     if (wallet.address !== account) throw new Error("the sealed seed does not match this account");
