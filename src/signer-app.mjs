@@ -337,8 +337,9 @@ async function loadAccount(account) {
 
 function sent(account, back, hash, result) {
   const next = back || pwaUrl(account);
-  const returned = new URLSearchParams({ tx: hash, err: JSON.stringify(result) });
-  location.replace(`${next}#${returned}`);
+  const pre = el("pre", { class: "json" }, [JSON.stringify(result, null, 2)]);
+  const backBtn = el("button", { onclick: () => location.assign(`${next}#tx=${hash}`) }, ["Back to wallet"]);
+  screen("Result", [pre, backBtn]);
 }
 
 function txJson(prepared, pubkey) {
