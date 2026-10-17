@@ -1,0 +1,49 @@
+# P-256 wallet bootloader
+
+An on-ledger Xahau wallet. The account publishes a small HTML wallet (`AccountSet.AppLoader`, at most 4096 bytes). The [passkey firewall](https://github.com/shortthefomo/passkey_p256_firewall) v2 hook is installed unnamed, so a transaction cannot skip it. After it is locked, every gated transaction needs a WebAuthn assertion from the attached iPhone.
+
+The network is the passkey devnet (network id 21339, build `2026.10.17-HEAD+4160`). It has `PWALoader` and the firewall calls `util_sha256` and `util_verify_p256`. The wallet is served at `https://pwa.passkey.xahau-dev.net/<account>` after the account publishes a loader.
+
+| | |
+| --- | --- |
+| Wallet host | https://pwa.passkey.xahau-dev.net/`<account>` |
+| RPC | https://rpc.passkey.xahau-dev.net |
+| WebSocket | wss://passkey.xahau-dev.net |
+| Explorer | https://explorer.passkey.xahau-dev.net |
+| Faucet | `POST https://faucet.passkey.xahau-dev.net/accounts` |
+
+## Why signing leaves the wallet page
+
+The node serves the loader with `Content-Security-Policy: sandbox allow-scripts allow-forms allow-popups`. That page has an opaque origin, and WebAuthn refuses an opaque origin. The wallet still collects the payment. Confirming it navigates to this signer, which has a normal https origin. Face ID runs there. The signer submits the transaction, with the passkey memo the hook checks, and returns to the wallet.
+
+The hook does not replace the account signature. On attach, the family seed is sealed with the passkey's PRF output and stored as ciphertext in the loader. A later payment asks for the same passkey, opens the seed, and signs. Without PRF, the seed stays in this browser and the hook still requires the passkey.
+
+The stored origin has to be 8 to 64 characters. `http://127.0.0.1:8787` fits. A long tunnel hostname may not.
+
+## Wallet
+
+This repository is the wallet. GitHub Pages serves it. The page builds a transaction, Face ID signs it, and the firewall hook on the account accepts or rejects the submission. The on-ledger bootloader is the account page. Its sign button opens this wallet and returns when the transaction is in a ledger.
+
+Push the repository to GitHub and turn on Pages (the `pages` workflow publishes the site). The site origin, such as `https://shortthefomo.github.io`, must be 64 characters or fewer. `github.io` is a public suffix, so the passkey belongs to that full host. Open the Pages URL in Safari on the iPhone.
+
+- **Create a wallet and attach iPhone** funds a new account from the faucet, shows the seed once, then opens the passkey prompt.
+- The wallet installs the hook with that iPhone public key, publishes the bootloader pointed at this same URL, and sets the level.
+- **Lock the hook** (level 3) means a lost passkey locks the account. The seed cannot remove the hook. Leave it off for level 2: payments and account changes still need the phone, and `SetHook` can still remove the hook.
+- **Sign a transaction** builds a payment, trust line, offer, escrow, check, domain change, regular key, preauthorization, tickets, invoke, or account delete. Face ID signs it and the wallet submits it.
+
+The bootloader then lives at `https://pwa.passkey.xahau-dev.net/<account>`. A payment there comes back here. **Other transactions** opens the full form.
+
+`npm run serve` serves the same wallet at http://127.0.0.1:8787/signer.html for a desktop browser. An iPhone passkey has to be created on the https Pages origin.
+
+## Levels
+
+The hook is [v2 of passkey_p256_firewall](https://github.com/shortthefomo/passkey_p256_firewall/tree/main/v2) (`168e6b11`), wasm in `public/passkey_p256_firewall_v2.wasm`. It is not renamed.
+
+| Level | What needs the passkey |
+| --- | --- |
+| 2 | Outgoing payments, plus value and account-control transactions, including Invoke. `SetHook` still passes. |
+| 3 | Every outgoing transaction the hook runs on, including `SetHook`. |
+
+Payments use the 53-byte payment challenge as the WebAuthn challenge. Other gated transactions use the transaction-hash challenge. A memo for a different amount, destination, or sequence is rejected.
+
+`npm run live` funds a throwaway account on this devnet, installs the hook with a software passkey (not an iPhone), publishes the loader, and checks that `https://pwa.passkey.xahau-dev.net/<account>` serves it. An unsigned payment must fail and a v2 memo must succeed.
