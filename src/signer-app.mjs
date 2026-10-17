@@ -335,9 +335,16 @@ async function loadAccount(account) {
   return { balance: BigInt(info.account_data.Balance), vault, credentialId: cid ? hexToBytes(cid) : null, spk };
 }
 
-function sent(account, back, hash) {
+function sent(account, back, hash, result) {
   const next = back || pwaUrl(account);
-  location.replace(`${next}#tx=${hash}`);
+  const returned = new URLSearchParams({ tx: hash, err: JSON.stringify(result) });
+  location.replace(`${next}#${returned}`);
+}
+
+function txJson(prepared, pubkey) {
+  const view = { ...prepared };
+  if (pubkey) view.SigningPubKey = pubkey;
+  return JSON.stringify(view, null, 2);
 }
 
 function rejected(account, back, error) {
@@ -347,14 +354,8 @@ function rejected(account, back, error) {
   ]);
 }
 
-async function approve({ account, back, summary, make, needsPublicKey }) {
+async function approve({ account, back, make, needsPublicKey }) {
   const loaded = await loadAccount(account);
-  const go = el("button", {}, ["Sign with iPhone"]);
-  screen(summary, [
-    el("p", { class: "mono" }, [account]),
-    el("p", { class: "muted" }, [`Network fee ${dropsToXah(HOOK_FEE)} XAH. The hook rejects this without your iPhone.`]),
-    go,
-  ]);
   const api = globalThis.XrplAccountLib;
   const idBytes = accountBytes(api, account);
   const salt = await prfSalt(idBytes);
@@ -365,14 +366,19 @@ async function approve({ account, back, summary, make, needsPublicKey }) {
     seed = "";
   }
   let spk = loaded.spk || (seed ? walletFromSeed(seed).keypair.publicKey : "");
+  const fresh = await rpc("account_info", { account, ledger_index: "validated" });
+  const made = make(fresh.account_data.Sequence);
+  const holder = { address: account, keypair: { publicKey: spk } };
+  const prepared = await prepareFields(rpc, holder, { ...made.tx, Sequence: fresh.account_data.Sequence, Fee: HOOK_FEE });
+  const pre = el("pre", { class: "json" });
+  const paint = () => { pre.textContent = txJson(prepared, spk); };
+  paint();
+  const go = el("button", {}, ["Sign with iPhone"]);
+  screen("Transaction", [pre, go]);
 
   async function finish() {
     go.disabled = true;
-    const fresh = await rpc("account_info", { account, ledger_index: "validated" });
-    const made = make(fresh.account_data.Sequence);
     const definitions = await networkDefinitions(api, rpc);
-    const holder = { address: account, keypair: { publicKey: spk } };
-    const prepared = await prepareFields(rpc, holder, { ...made.tx, Sequence: fresh.account_data.Sequence, Fee: HOOK_FEE });
     const challenge = made.payment
       ? await paymentChallenge(api, { sequence: prepared.Sequence, destination: made.payment.destination, drops: made.payment.drops })
       : await txChallenge(api, prepared, holder, definitions);
@@ -391,7 +397,7 @@ async function approve({ account, back, summary, make, needsPublicKey }) {
     }
     const tx = await submitTx(api, rpc, wallet, { ...prepared, Memos: [assertionParts(assertion)] }, definitions);
     if (tx.result !== "tesSUCCESS") throw new Error(`${tx.result} ${tx.hook}`.trim());
-    sent(account, back, tx.hash);
+    sent(account, back, tx.hash, tx.validated);
   }
 
   go.addEventListener("click", async () => {
@@ -401,6 +407,8 @@ async function approve({ account, back, summary, make, needsPublicKey }) {
         const warm = await getPasskey(crypto.getRandomValues(new Uint8Array(32)), salt, loaded.credentialId);
         seed = await unlockSeed(account, warm, loaded.vault);
         spk = walletFromSeed(seed).keypair.publicKey;
+        holder.keypair.publicKey = spk;
+        paint();
         go.disabled = false;
         go.textContent = "Face ID again to approve this transaction";
         return;
@@ -439,7 +447,6 @@ function composer({ account, back }) {
       approve({
         account,
         back,
-        summary: preview.summary,
         needsPublicKey: !preview.payment,
         make: () => transactionFromKind(kindSelect.value, values),
       }).catch((error) => rejected(account, back, error));
@@ -457,7 +464,7 @@ async function pay({ account, dest, xah, back }) {
     throw new Error(`balance is ${dropsToXah(balance)} XAH. This send needs ${dropsToXah(drops + BigInt(HOOK_FEE))} including the fee.`);
   }
   const made = transactionFromKind("Payment", { destination: dest, xah });
-  await approve({ account, back, summary: made.summary, needsPublicKey: false, make: () => made });
+  await approve({ account, back, needsPublicKey: false, make: () => made });
 }
 
 function home() {
