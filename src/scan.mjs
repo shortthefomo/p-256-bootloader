@@ -191,6 +191,7 @@ export function describeTx(entry) {
   const ok = result === "" || result === "tesSUCCESS";
   const destination = tx.Destination || "";
   const amount = typeof tx.Amount === "string" ? tx.Amount : "";
+  const tokenId = String(tx.URITokenID || "").toUpperCase();
   let shown = "";
   if (type === "OfferCreate") {
     const gives = formatAmount(tx.TakerGets);
@@ -204,7 +205,7 @@ export function describeTx(entry) {
   let line = type;
   if (shown) line += ` · ${shown}`;
   if (destination) line += ` to ${shortAddress(destination)}`;
-  return { type, hash, ledger, ok, destination, amount, line, account: tx.Account || "" };
+  return { type, hash, ledger, ok, destination, amount, tokenId, line, account: tx.Account || "" };
 }
 
 export function samePayment(row, { dest, drops }) {

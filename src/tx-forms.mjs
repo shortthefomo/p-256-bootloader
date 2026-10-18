@@ -2,6 +2,8 @@
 // challenge. Every other type uses the generic transaction challenge, so the
 // fields here must be the fields that will be signed.
 
+import { uriToHex } from "./uri-tokens.mjs";
+
 const RIPPLE_EPOCH = 946684800;
 
 function address(value, label) {
@@ -17,6 +19,14 @@ function xah(value, label) {
   const drops = BigInt(whole) * 1000000n + BigInt((frac + "000000").slice(0, 6));
   if (drops <= 0n) throw new Error(`${label} must be greater than 0`);
   return drops;
+}
+
+// A URI token sell may be 0 XAH when a recipient is named. That is a transfer
+// the recipient accepts. Payments still use xah(), which rejects 0.
+function tokenDrops(value, label) {
+  const text = String(value ?? "").trim();
+  if (text === "0") return "0";
+  return String(xah(text, label));
 }
 
 function decimal(value, label) {
@@ -309,6 +319,47 @@ export function transactionFromKind(kind, values, nowSec = Math.floor(Date.now()
   if (kind === "AccountDelete") {
     const destination = address(input.destination, "destination");
     return { summary: `Delete account and send the remainder to ${destination}`, payment: null, tx: { TransactionType: "AccountDelete", Destination: destination } };
+  }
+  if (kind === "URITokenMint") {
+    const uri = String(input.uri || "").trim();
+    const tx = { TransactionType: "URITokenMint", URI: uriToHex(uri) };
+    if (input.burnable === "1" || input.burnable === "true") tx.Flags = 1;
+    const price = String(input.xah || "").trim();
+    if (price) tx.Amount = String(xah(price, "price"));
+    const buyer = String(input.destination || "").trim();
+    if (buyer) tx.Destination = address(buyer, "buyer");
+    if (tx.Destination && !tx.Amount) throw new Error("a private sale needs a price");
+    return { summary: `Mint ${uri}`, payment: null, tx };
+  }
+  if (kind === "URITokenBurn") {
+    const id = hex64(input.id, "token");
+    return { summary: `Burn URI token ${id}`, payment: null, tx: { TransactionType: "URITokenBurn", URITokenID: id } };
+  }
+  if (kind === "URITokenCreateSellOffer") {
+    const id = hex64(input.id, "token");
+    const buyer = String(input.destination || "").trim();
+    const drops = tokenDrops(input.xah, "price");
+    if (drops === "0" && !buyer) throw new Error("a free transfer needs a recipient");
+    const tx = {
+      TransactionType: "URITokenCreateSellOffer",
+      URITokenID: id,
+      Amount: drops,
+    };
+    if (buyer) tx.Destination = address(buyer, "buyer");
+    return { summary: `Sell URI token ${id} for ${String(input.xah).trim()} XAH`, payment: null, tx };
+  }
+  if (kind === "URITokenCancelSellOffer") {
+    const id = hex64(input.id, "token");
+    return { summary: `Cancel the sale of URI token ${id}`, payment: null, tx: { TransactionType: "URITokenCancelSellOffer", URITokenID: id } };
+  }
+  if (kind === "URITokenBuy") {
+    const id = hex64(input.id, "token");
+    const drops = tokenDrops(input.xah, "price");
+    return {
+      summary: `Buy URI token ${id} for ${String(input.xah).trim()} XAH`,
+      payment: null,
+      tx: { TransactionType: "URITokenBuy", URITokenID: id, Amount: drops },
+    };
   }
   throw new Error("choose a transaction type");
 }

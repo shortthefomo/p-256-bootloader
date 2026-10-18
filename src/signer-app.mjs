@@ -11,6 +11,7 @@ import {
   shortAddress,
 } from "./scan.mjs";
 import { TX_KINDS, transactionFromKind } from "./tx-forms.mjs";
+import { incomingOffer, normalizeUriToken } from "./uri-tokens.mjs";
 import {
   asciiHex,
   base64url,
@@ -678,8 +679,8 @@ function renderNav(active) {
   nav.hidden = false;
   const phone = shell() === "phone";
   const items = phone
-    ? ["home", "send", "scan", "receive", "settings"]
-    : ["home", "send", "receive", "activity", "scan", "settings"];
+    ? ["home", "send", "nfts", "scan", "receive", "settings"]
+    : ["home", "send", "receive", "nfts", "activity", "scan", "settings"];
   const buttons = items.map((id) => {
     const label = text(id);
     return el("button", {
@@ -1062,6 +1063,7 @@ function route(id, account) {
   else if (id === "send") sendForm(account);
   else if (id === "scan") scan(account);
   else if (id === "receive") receive(account);
+  else if (id === "nfts") uriTokens(account);
   else if (id === "settings") settings(account);
   else activity(account);
 }
@@ -1114,29 +1116,85 @@ function txDetail(type, line) {
   return line.startsWith(prefix) ? line.slice(prefix.length) : line;
 }
 
-function txRow(row) {
+const DECLINED_KEY = "p256-declined-offers";
+
+function declinedOffers() {
+  try {
+    const list = JSON.parse(sessionStorage.getItem(DECLINED_KEY) || "[]");
+    return new Set(Array.isArray(list) ? list : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function declineOffer(key, button) {
+  const set = declinedOffers();
+  set.add(key);
+  try { sessionStorage.setItem(DECLINED_KEY, JSON.stringify([...set])); } catch { /* session storage can be unavailable */ }
+  const row = button.closest(".tx");
+  if (!row) return;
+  row.classList.remove("offer");
+  row.querySelector(".tx-actions")?.remove();
+}
+
+async function offerMap(account, rows) {
+  const ids = [];
+  for (const row of rows || []) {
+    if (row?.ok && row.type === "URITokenCreateSellOffer" && row.destination === account && row.tokenId && !ids.includes(row.tokenId)) {
+      ids.push(row.tokenId);
+    }
+  }
+  const map = new Map();
+  await Promise.all(ids.map(async (id) => {
+    try {
+      const entry = await rpc("ledger_entry", { index: id, ledger_index: "validated" });
+      const node = entry.node || {};
+      map.set(id, normalizeUriToken({ ...node, index: entry.index || node.index || id }));
+    } catch {
+      // A spent offer is no longer a ledger entry.
+    }
+  }));
+  return map;
+}
+
+function txRow(row, offer, account) {
   const type = row.type || "Transaction";
   const links = explorerLinks(row.hash);
   const ok = Boolean(row.ok);
+  const detail = txDetail(type, row.line || "");
+  const end = [];
+  if (!ok) end.push(el("span", { class: "tx-flag" }, ["Failed"]));
+  end.push(offer && links[0]
+    ? el("a", { class: "tx-hash", href: links[0].url, target: "_blank", rel: "noopener" }, [shortAddress(row.hash)])
+    : el("span", { class: "tx-hash" }, [shortAddress(row.hash)]));
+  const actions = offer ? el("div", { class: "tx-actions" }, [
+    el("button", {
+      type: "button",
+      onclick: () => signToken(account, "URITokenBuy", { id: offer.id, xah: offer.xah }),
+    }, [text("nftAccept")]),
+    el("button", {
+      class: "ghost",
+      type: "button",
+      onclick: (event) => declineOffer(offer.key, event.currentTarget),
+    }, [text("nftDecline")]),
+  ]) : null;
+  const body = [
+    el("span", { class: "tx-type" }, [type]),
+    el("span", { class: "tx-main" }, detail ? [detail] : []),
+    el("span", { class: "tx-end" }, end),
+    actions,
+  ];
+  if (offer) return el("div", { class: ok ? "tx offer" : "tx bad offer" }, body);
   const attrs = { class: ok ? "tx" : "tx bad" };
   if (links[0]) {
     attrs.href = links[0].url;
     attrs.target = "_blank";
     attrs.rel = "noopener";
   }
-  const detail = txDetail(type, row.line || "");
-  const end = [];
-  if (!ok) end.push(el("span", { class: "tx-flag" }, ["Failed"]));
-  end.push(el("span", { class: "tx-hash" }, [shortAddress(row.hash)]));
-  const body = [
-    el("span", { class: "tx-type" }, [type]),
-    el("span", { class: "tx-main" }, detail ? [detail] : []),
-    el("span", { class: "tx-end" }, end),
-  ];
   return links[0] ? el("a", attrs, body) : el("div", attrs, body);
 }
 
-function txList(rows) {
+function txList(rows, account = "", offers = new Map()) {
   if (!rows.length) return el("p", { class: "muted" }, [text("emptyActivity")]);
   const head = shell() === "desk"
     ? el("div", { class: "tx-head", "aria-hidden": "true" }, [
@@ -1145,7 +1203,15 @@ function txList(rows) {
       el("span", {}, [text("hash")]),
     ])
     : null;
-  return el("div", { class: "tx-list" }, [head, ...rows.map(txRow)]);
+  const declined = declinedOffers();
+  const seen = new Set();
+  const nodes = rows.map((row) => {
+    const offer = incomingOffer(row, account, offers.get(row.tokenId));
+    if (!offer || seen.has(offer.id)) return txRow(row);
+    seen.add(offer.id);
+    return txRow(row, declined.has(offer.key) ? null : offer, account);
+  });
+  return el("div", { class: "tx-list" }, [head, ...nodes]);
 }
 
 function holdsBalance(line) {
@@ -1187,11 +1253,11 @@ function followLedgers(account, gen, paint) {
     busy = true;
     Promise.all([
       rpc("account_info", { account, ledger_index: "validated" }),
-      recent(account, 6).catch(() => null),
+      recent(account, 6).then(async (rows) => ({ rows, offers: await offerMap(account, rows) })).catch(() => null),
       issuedLines(account),
-    ]).then(([info, rows, lines]) => {
+    ]).then(([info, pack, lines]) => {
       if (gen !== viewGen) return;
-      paint(showAmount(info.account_data.Balance), rows, lines);
+      paint(showAmount(info.account_data.Balance), pack && pack.rows, lines, pack && pack.offers);
     }).catch(() => {}).finally(() => {
       busy = false;
       if (again && gen === viewGen) {
@@ -1233,9 +1299,9 @@ async function walletHome(account) {
   screen(text("wallet"), [el("p", { class: "muted" }, [text("loadingAccount")])], "home");
   const gen = viewGen;
   try {
-    const [info, rows, lines] = await Promise.all([
+    const [info, pack, lines] = await Promise.all([
       rpc("account_info", { account, ledger_index: "validated" }),
-      recent(account, 6).catch(() => []),
+      recent(account, 6).then(async (rows) => ({ rows, offers: await offerMap(account, rows) })).catch(() => ({ rows: [], offers: new Map() })),
       issuedLines(account),
     ]);
     if (gen !== viewGen) return;
@@ -1246,7 +1312,7 @@ async function walletHome(account) {
     const feed = el("div", { class: "feed" });
     let shownRows = null;
     let shownLines = null;
-    const paint = (balance, nextRows, nextLines) => {
+    const paint = (balance, nextRows, nextLines, offers) => {
       if (amount.data !== balance) amount.data = balance;
       if (nextLines != null) {
         const lineSig = nextLines.map((line) => `${line.currency}:${line.account}:${line.balance}`).join(" ");
@@ -1259,9 +1325,9 @@ async function walletHome(account) {
       const signature = nextRows.map((row) => `${row.hash}:${row.ok}`).join(" ");
       if (signature === shownRows) return;
       shownRows = signature;
-      feed.replaceChildren(txList(nextRows));
+      feed.replaceChildren(txList(nextRows, account, offers || new Map()));
     };
-    paint(amount.data, rows, lines);
+    paint(amount.data, pack.rows, lines, pack.offers);
     const hero = [
       el("p", { class: "balance" }, [amount, el("span", {}, [" XAH"])]),
       linesBox,
@@ -1378,14 +1444,174 @@ function receive(account) {
   ], "receive");
 }
 
+async function listedTokens(account) {
+  const tokens = [];
+  let marker;
+  for (let pageNo = 0; pageNo < 8; pageNo += 1) {
+    const query = { account, type: "uri_token", ledger_index: "validated", limit: 200 };
+    if (marker) query.marker = marker;
+    const page = await rpc("account_objects", query);
+    for (const object of page.account_objects || []) tokens.push(normalizeUriToken(object));
+    marker = page.marker;
+    if (!marker) break;
+  }
+  return tokens;
+}
+
+function tokenBack(account) {
+  return safeReturn(params.get("return") || "", account) || pwaUrl(account);
+}
+
+function priceLabel(amount) {
+  if (amount == null || amount === "") return "";
+  if (typeof amount === "string") return `${showAmount(amount)} XAH`;
+  return `${amount.value || ""} ${amount.currency || ""}`.trim();
+}
+
+function signToken(account, kind, values) {
+  const back = tokenBack(account);
+  openBuilt({ account, kind, values, back }).catch((error) => rejected(account, back, error));
+}
+
+function plainPrice(value) {
+  const typed = String(value || "");
+  if (!typed.trim()) return "";
+  const plain = canonicalAmount(typed);
+  if (!plain) throw new Error(text("amountInvalid"));
+  return plain;
+}
+
+function mintForm(account) {
+  const uri = el("input", { type: "text", placeholder: text("nftUri"), autocomplete: "off", spellcheck: "false" });
+  const price = el("input", { type: "text", placeholder: text("nftPrice"), inputMode: "decimal", autocomplete: "off" });
+  const buyer = el("input", { type: "text", placeholder: text("nftBuyer"), autocomplete: "off", spellcheck: "false" });
+  const burnable = el("input", { type: "checkbox" });
+  const go = el("button", { type: "button" }, [text("nftMint")]);
+  go.addEventListener("click", () => {
+    try {
+      const values = { uri: uri.value.trim(), burnable: burnable.checked ? "1" : "" };
+      const xah = plainPrice(price.value);
+      if (xah) values.xah = xah;
+      if (buyer.value.trim()) values.destination = buyer.value.trim();
+      signToken(account, "URITokenMint", values);
+    } catch (error) {
+      rejected(account, tokenBack(account), error);
+    }
+  });
+  return el("section", { class: "card" }, [
+    el("h2", {}, [text("nftMint")]),
+    uri,
+    price,
+    buyer,
+    el("label", {}, [burnable, el("span", {}, [text("nftBurnable")])]),
+    go,
+  ]);
+}
+
+function sellFields(account, id) {
+  const price = el("input", { type: "text", placeholder: text("nftPrice"), inputMode: "decimal", autocomplete: "off" });
+  const buyer = el("input", { type: "text", placeholder: text("nftBuyer"), autocomplete: "off", spellcheck: "false" });
+  const go = el("button", { type: "button" }, [text("nftSell")]);
+  go.addEventListener("click", () => {
+    try {
+      const values = { id, xah: plainPrice(price.value) };
+      if (!values.xah) throw new Error(text("amountInvalid"));
+      if (buyer.value.trim()) values.destination = buyer.value.trim();
+      signToken(account, "URITokenCreateSellOffer", values);
+    } catch (error) {
+      rejected(account, tokenBack(account), error);
+    }
+  });
+  return el("div", {}, [price, buyer, go]);
+}
+
+function buyForm(account) {
+  const id = el("input", { type: "text", placeholder: text("nftTokenId"), autocomplete: "off", spellcheck: "false" });
+  const price = el("input", { type: "text", placeholder: text("nftPrice"), inputMode: "decimal", autocomplete: "off" });
+  const go = el("button", { class: "ghost", type: "button" }, [text("nftBuy")]);
+  go.addEventListener("click", () => {
+    try {
+      const xah = plainPrice(price.value);
+      if (!xah) throw new Error(text("amountInvalid"));
+      signToken(account, "URITokenBuy", { id: id.value.trim(), xah });
+    } catch (error) {
+      rejected(account, tokenBack(account), error);
+    }
+  });
+  return el("section", { class: "card" }, [el("h2", {}, [text("nftBuy")]), id, price, go]);
+}
+
+function tokenCard(account, token, openSell) {
+  const title = token.code || token.uri || token.id;
+  const bits = [];
+  if (token.edition) bits.push(`${text("nftEdition")} ${token.edition}`);
+  if (token.issuer) bits.push(shortAddress(token.issuer));
+  const sale = priceLabel(token.amount);
+  const actions = [
+    el("button", {
+      class: "ghost",
+      type: "button",
+      onclick: () => signToken(account, "URITokenBurn", { id: token.id }),
+    }, [text("nftBurn")]),
+  ];
+  if (sale) {
+    actions.push(el("button", {
+      class: "ghost",
+      type: "button",
+      onclick: () => signToken(account, "URITokenCancelSellOffer", { id: token.id }),
+    }, [text("nftCancelSale")]));
+  }
+  const copy = [
+    el("strong", {}, [title]),
+    bits.length ? el("p", { class: "muted" }, [bits.join(" · ")]) : null,
+    sale ? el("p", {}, [`${text("nftForSale")} ${sale}`]) : null,
+    token.destination ? el("p", { class: "muted" }, [shortAddress(token.destination)]) : null,
+    el("div", { class: "nft-actions" }, actions),
+    el("details", openSell ? { open: "open" } : {}, [el("summary", {}, [text("nftSell")]), sellFields(account, token.id)]),
+  ];
+  return el("article", { class: "nft" }, [
+    token.art ? el("img", { src: token.art, alt: title }) : null,
+    el("div", {}, copy),
+  ]);
+}
+
+async function uriTokens(account, focus = {}) {
+  rememberAccount(account);
+  screen(text("nfts"), [el("p", { class: "muted" }, [text("loading")])], "nfts");
+  const gen = viewGen;
+  try {
+    const tokens = await listedTokens(account);
+    if (gen !== viewGen) return;
+    const wanted = String(focus.id || "").toUpperCase();
+    const cards = tokens.length
+      ? tokens.map((token) => tokenCard(account, token, focus.act === "sell" && token.id === wanted))
+      : [el("p", { class: "muted" }, [text("nftEmpty")])];
+    const missingSale = focus.act === "sell" && wanted && !tokens.some((token) => token.id === wanted);
+    screen(text("nfts"), [
+      mintForm(account),
+      ...cards,
+      missingSale ? el("section", { class: "card" }, [
+        el("h2", {}, [text("nftSell")]),
+        el("p", { class: "mono" }, [wanted]),
+        sellFields(account, wanted),
+      ]) : null,
+      buyForm(account),
+    ], "nfts");
+  } catch {
+    if (gen !== viewGen) return;
+    screen(text("nfts"), [el("p", {}, [text("nftUnavailable")])], "nfts");
+  }
+}
+
 async function activity(account) {
   rememberAccount(account);
   screen(text("activity"), [el("p", { class: "muted" }, [text("loading")])], "activity");
   const gen = viewGen;
   try {
     const rows = await recent(account, 15);
+    const offers = await offerMap(account, rows);
     if (gen !== viewGen) return;
-    screen(text("activity"), [txList(rows)], "activity");
+    screen(text("activity"), [txList(rows, account, offers)], "activity");
   } catch (error) {
     if (gen !== viewGen) return;
     screen(text("activity"), [el("p", {}, [error.message || String(error)])], "activity");
@@ -1840,7 +2066,7 @@ async function main() {
     return;
   }
   const op = params.get("op");
-  if (!globalThis.PublicKeyCredential && shell() === "phone" && op !== "scan" && op !== "receive" && op !== "settings" && op !== "update") {
+  if (!globalThis.PublicKeyCredential && shell() === "phone" && op !== "scan" && op !== "receive" && op !== "settings" && op !== "update" && op !== "nfts") {
     screen("No passkeys here", [el("p", {}, ["This browser has no WebAuthn. Open the wallet in Safari on the iPhone."])]);
     return;
   }
@@ -1898,6 +2124,39 @@ async function main() {
         return;
       }
       composer({ account, back });
+      return;
+    }
+    if (op === "nfts") {
+      const account = params.get("account") || savedAccount();
+      if (!isAddress(account)) {
+        home();
+        return;
+      }
+      rememberAccount(account);
+      const act = params.get("act") || "";
+      const id = (params.get("id") || "").trim();
+      const back = safeReturn(params.get("return") || "", account) || pwaUrl(account);
+      if ((act === "burn" || act === "cancel") && id) {
+        openBuilt({
+          account,
+          kind: act === "burn" ? "URITokenBurn" : "URITokenCancelSellOffer",
+          values: { id },
+          back,
+        }).catch((error) => rejected(account, back, error));
+        return;
+      }
+      if (act === "buy" && id) {
+        const xah = params.get("xah") || "";
+        if (!/^\d+(\.\d{0,6})?$/.test(xah)) throw new Error(text("amountInvalid"));
+        openBuilt({
+          account,
+          kind: "URITokenBuy",
+          values: { id, xah },
+          back,
+        }).catch((error) => rejected(account, back, error));
+        return;
+      }
+      await uriTokens(account, { act, id });
       return;
     }
     if (op === "settings" || op === "update") {

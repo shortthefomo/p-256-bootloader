@@ -126,6 +126,11 @@ details.raw pre.json { margin: 0; border: 0; border-radius: 0; border-top: 1px s
   text-decoration: none;
 }
 a.tx { cursor: pointer; color: inherit; text-decoration: none; }
+.nft { display: flex; gap: 0.85rem; align-items: flex-start; margin: 0.85rem 0; padding-bottom: 0.85rem; border-bottom: 1px solid var(--line); }
+.nft img { width: 4.75rem; height: auto; border-radius: 0.45rem; flex: none; background: var(--surface-2); }
+.nft strong, .nft .mono { overflow-wrap: anywhere; }
+.nft-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.nft-actions a.b { width: auto; display: inline-block; margin: 0; padding: 0.45rem 0.75rem; }
 .tx-type { grid-area: type; font-weight: 650; font-size: 1rem; color: var(--text); }
 .tx-main {
   grid-area: main;
@@ -142,6 +147,9 @@ html[data-shell="phone"] .tx-main:empty { display: none; }
 .tx-end { grid-area: end; display: flex; align-items: baseline; justify-content: flex-end; gap: 0.45rem; white-space: nowrap; }
 .tx-hash { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; font-weight: 400; color: var(--muted); }
 .tx-flag { font-size: 0.75rem; font-weight: 650; color: var(--danger); }
+.tx.offer { grid-template-areas: "type end" "main end" "actions actions"; align-items: center; }
+.tx-actions { grid-area: actions; display: flex; flex-wrap: wrap; gap: 0.4rem; padding-top: 0.35rem; }
+.tx-actions button, .tx-actions a.b { width: auto; display: inline-block; margin: 0; padding: 0.4rem 0.7rem; }
 .tx.bad .tx-type { color: var(--danger); }
 a.tx:hover { background: var(--surface-2); color: inherit; text-decoration: none; }
 a.tx:active { background: var(--line); color: inherit; }
@@ -173,7 +181,8 @@ html[data-shell="phone"] #settings h2 { display: block; }
 html[data-shell="desk"] #settings { display: none; grid-column: 1 / -1; }
 html[data-shell="desk"] #layout.settings-open #send,
 html[data-shell="desk"] #layout.settings-open #receive,
-html[data-shell="desk"] #layout.settings-open #activity { display: none; }
+html[data-shell="desk"] #layout.settings-open #activity,
+html[data-shell="desk"] #layout.settings-open #nfts { display: none; }
 html[data-shell="desk"] #layout.settings-open #settings { display: block; }
 label.setting { display: flex; flex-direction: column; gap: 0.25rem; margin: 0 0 0.8rem; color: var(--muted); font-size: 0.8125rem; font-weight: 650; }
 .kv { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 0.35rem 0.75rem; margin: 0.2rem 0 0.6rem; font-size: 0.8125rem; }
@@ -258,7 +267,8 @@ html[data-shell="desk"] .panel {
   border-radius: 1rem;
   padding: 1rem 1.05rem 1.1rem;
 }
-html[data-shell="desk"] #activity { grid-column: 1 / -1; min-width: 0; }
+html[data-shell="desk"] #activity,
+html[data-shell="desk"] #nfts { grid-column: 1 / -1; min-width: 0; }
 html[data-shell="desk"] #send input,
 html[data-shell="desk"] #send a.b,
 html[data-shell="desk"] #receive a.b { max-width: 28rem; }
@@ -280,6 +290,7 @@ html[data-shell="desk"] .tx {
   align-items: center;
   padding: 0.7rem 0.75rem;
 }
+html[data-shell="desk"] .tx.offer { grid-template-areas: "type main end" "actions actions actions"; }
 html[data-shell="desk"] .tx-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html[data-shell="desk"] .tx-main { font-size: 0.95rem; color: var(--text); }
 @media (max-width: 720px) {
@@ -292,6 +303,7 @@ html[data-shell="desk"] .tx-main { font-size: 0.95rem; color: var(--text); }
     align-items: baseline;
     padding: 0.7rem 0;
   }
+  html[data-shell="desk"] .tx.offer { grid-template-areas: "type end" "main end" "actions actions"; }
   html[data-shell="desk"] .tx-main { font-size: 0.8125rem; color: var(--muted); }
   html[data-shell="desk"] .tx-main:empty { display: none; }
 }

@@ -2,3 +2,4 @@ node_modules/
 public/vendor/
 site/
 .local-wallet.json
+.uri-cards.env
