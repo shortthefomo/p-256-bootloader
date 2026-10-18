@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { assertLoaderHtml, renderBootloader } from "../src/bootloader.mjs";
+import { assertLoaderHtml, loaderChanged, renderBootloader } from "../src/bootloader.mjs";
 import { transactionFromKind } from "../src/tx-forms.mjs";
 import {
   DEVICE_FLAGS,
@@ -91,9 +91,18 @@ check("loader loads the github stylesheet", html.includes("https://shortthefomo.
 check("loader loads the github script", html.includes("https://shortthefomo.github.io/p-256-bootloader/wallet.js"));
 check("loader keeps its style off the ledger", !html.includes("<style"));
 check("loader has one script tag", html.split("</script>").length === 2);
+const loaderFields = {
+  signer: "https://shortthefomo.github.io/p-256-bootloader/",
+  vault: bytesToHex(vault),
+  cid: "aa".repeat(16),
+};
+check("a current loader is not an update", !loaderChanged(html, loaderFields));
+check("a changed loader is an update", loaderChanged(html.replace("Wallet", "Purse"), loaderFields));
+check("a missing loader is not an update", !loaderChanged("", loaderFields));
 const walletJs = readFileSync(new URL("../public/wallet.js", import.meta.url), "utf8");
 check("wallet script names the namespace", walletJs.includes(NAMESPACE));
 check("wallet leaves the ledger through a link", walletJs.includes("function href(") && !walletJs.includes("location.assign"));
+check("update is offered only for an old page", html.includes('<meta name="rev" content="2">') && walletJs.includes('content !== "2"'));
 
 let firewall = null;
 try {
@@ -152,6 +161,65 @@ damaged[qr.size * (qr.size - 1) - 3] ^= 1;
 check("qr repairs two bad modules", decodeQr(damaged, qr.size) === signText);
 const raster = rasterQr(signText, 4, 4);
 check("qr image roundtrip", decodeImage(raster.rgba, raster.width, raster.height) === signText);
+
+function placeQr(src, sw, sh, frame, fraction, degrees = 0) {
+  const scene = new Uint8ClampedArray(frame * frame * 4);
+  for (let i = 0; i < scene.length; i += 4) {
+    scene[i] = 24;
+    scene[i + 1] = 24;
+    scene[i + 2] = 24;
+    scene[i + 3] = 255;
+  }
+  const rad = degrees * Math.PI / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const side = frame * fraction;
+  const scale = side / sw;
+  const cx = (frame - 1) / 2;
+  const cy = (frame - 1) / 2;
+  const half = sw / 2;
+  // The rotated square sticks out past its old upright box. Cover that box
+  // or the finder corners are clipped and the code cannot be read.
+  const reach = Math.ceil((side / 2) * (Math.abs(cos) + Math.abs(sin))) + 2;
+  const y0 = Math.max(0, Math.floor(cy - reach));
+  const y1 = Math.min(frame - 1, Math.ceil(cy + reach));
+  const x0 = Math.max(0, Math.floor(cx - reach));
+  const x1 = Math.min(frame - 1, Math.ceil(cx + reach));
+  for (let y = y0; y <= y1; y += 1) {
+    for (let x = x0; x <= x1; x += 1) {
+      const dx = (x - cx) / scale;
+      const dy = (y - cy) / scale;
+      const sx = Math.round(cos * dx + sin * dy + half);
+      const sy = Math.round(-sin * dx + cos * dy + half);
+      if (sx < 0 || sy < 0 || sx >= sw || sy >= sh) continue;
+      const from = (sy * sw + sx) * 4;
+      const at = (y * frame + x) * 4;
+      scene[at] = src[from];
+      scene[at + 1] = src[from + 1];
+      scene[at + 2] = src[from + 2];
+      scene[at + 3] = 255;
+    }
+  }
+  for (let y = 1; y < frame - 1; y += 1) {
+    for (let x = 1; x < frame - 1; x += 1) {
+      const o = (y * frame + x) * 4;
+      scene[o] = (scene[o - 4] + scene[o] + scene[o + 4]) / 3;
+      scene[o + 1] = (scene[o - 3] + scene[o + 1] + scene[o + 5]) / 3;
+      scene[o + 2] = (scene[o - 2] + scene[o + 2] + scene[o + 6]) / 3;
+    }
+  }
+  return scene;
+}
+
+const soft = placeQr(raster.rgba, raster.width, raster.height, 640, 0.36);
+check("qr reads a small blurred code", decodeImage(soft, 640, 640) === signText);
+const tilted = placeQr(raster.rgba, raster.width, raster.height, 640, 0.55, 22);
+check("qr reads a tilted code", decodeImage(tilted, 640, 640, 0) === signText);
+const steep = placeQr(raster.rgba, raster.width, raster.height, 640, 0.55, 36);
+check(
+  "qr reads a steep tilt on a later frame",
+  [20, -20].some((turn) => decodeImage(steep, 640, 640, turn) === signText),
+);
 const longText = "https://wallet.example/sign?" + "a".repeat(240);
 const longQr = encodeQr(longText);
 check("long qr roundtrip", decodeQr(longQr.modules, longQr.size) === longText && longQr.version > 8);

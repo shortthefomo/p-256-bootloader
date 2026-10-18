@@ -1,4 +1,4 @@
-import { renderBootloader } from "./bootloader.mjs";
+import { loaderChanged, renderBootloader } from "./bootloader.mjs";
 import { decodeImage, encodeQr } from "./qr.mjs";
 import {
   describeTx,
@@ -84,15 +84,64 @@ function el(tag, attrs = {}, children = []) {
     else if (key.startsWith("on") && typeof value === "function") node.addEventListener(key.slice(2), value);
     else if (value != null) node.setAttribute(key, value);
   }
-  for (const child of children) node.append(child?.nodeType ? child : document.createTextNode(child ?? ""));
+  for (const child of children) {
+    if (child == null || child === false) continue;
+    node.append(child.nodeType ? child : document.createTextNode(String(child)));
+  }
   return node;
 }
 
 function screen(title, nodes, mode = "") {
   stopCamera();
   viewGen += 1;
-  app.replaceChildren(el("h1", {}, [title]), ...nodes);
+  app.replaceChildren(
+    el("header", { class: "top" }, [el("h1", {}, [title])]),
+    el("div", { class: "view" }, nodes.filter(Boolean)),
+  );
   if (mode) renderNav(mode);
+  else {
+    nav.hidden = true;
+    nav.replaceChildren();
+  }
+}
+
+async function pageIsStale(account) {
+  try {
+    const entry = await rpc("ledger_entry", { app_loader: account, ledger_index: "validated" });
+    const published = loaderHtmlFromEntry(entry);
+    const meta = vaultFromHtml(published);
+    return loaderChanged(published, {
+      signer: `${location.origin}${location.pathname}`,
+      vault: meta.vault,
+      cid: meta.cid,
+      spk: meta.spk,
+    });
+  } catch {
+    return false;
+  }
+}
+
+function updateBanner(account) {
+  const back = safeReturn(params.get("return") || "", account) || pwaUrl(account);
+  return el("div", { class: "banner" }, [
+    el("p", {}, ["A new wallet page is ready for this account."]),
+    el("button", {
+      type: "button",
+      onclick: () => republish(account, back).catch((error) => rejected(account, back, error)),
+    }, ["Install"]),
+  ]);
+}
+
+function layoutSwitch() {
+  if (shell() !== "phone") return null;
+  return el("button", {
+    class: "link",
+    type: "button",
+    onclick: () => {
+      localStorage.setItem(SHELL_KEY, "desk");
+      location.reload();
+    },
+  }, ["Use the computer layout"]);
 }
 
 function say(parent, text, className = "muted") {
@@ -412,8 +461,11 @@ async function approve({ account, back, make, needsPublicKey }) {
   const pre = el("pre", { class: "json" });
   const paint = () => { pre.textContent = txJson(prepared, spk); };
   paint();
-  const go = el("button", {}, ["Sign with iPhone"]);
-  screen("Transaction", [pre, go]);
+  const go = el("button", {}, ["Approve"]);
+  screen(made.summary || "Approve", [
+    el("details", {}, [el("summary", {}, ["Transaction details"]), pre]),
+    go,
+  ]);
 
   async function finish() {
     go.disabled = true;
@@ -495,8 +547,12 @@ function composer({ account, back }) {
   kindSelect.addEventListener("change", draw);
   draw();
   const review = el("button", {}, ["Review"]);
-  const update = el("button", { class: "ghost", onclick: () => republish(account, back).catch((error) => rejected(account, back, error)) }, ["Update the wallet page"]);
-  screen("New transaction", [el("p", { class: "mono" }, [account]), kindSelect, fields, review, update]);
+  const body = [kindSelect, fields, review, el("button", {
+    class: "link",
+    type: "button",
+    onclick: () => sendForm(account),
+  }, ["Back to send"])];
+  screen("Other transaction", shell() === "desk" ? [el("div", { class: "card form" }, body)] : body, "send");
   review.addEventListener("click", () => {
     const values = Object.fromEntries([...inputs].map(([key, input]) => [key, input.value]));
     try {
@@ -525,7 +581,8 @@ function renderNav(active) {
     return;
   }
   nav.hidden = false;
-  const items = shell() === "phone"
+  const phone = shell() === "phone";
+  const items = phone
     ? [["home", "Home"], ["send", "Send"], ["scan", "Scan"], ["receive", "Receive"]]
     : [["home", "Home"], ["send", "Send"], ["receive", "Receive"], ["activity", "Activity"], ["scan", "Scan"]];
   const buttons = items.map(([id, label]) => el("button", {
@@ -533,15 +590,25 @@ function renderNav(active) {
     type: "button",
     onclick: () => route(id, account),
   }, [label]));
-  buttons.push(el("button", {
-    class: "tab",
-    type: "button",
-    onclick: () => {
-      localStorage.setItem(SHELL_KEY, shell() === "desk" ? "phone" : "desk");
-      location.reload();
-    },
-  }, [shell() === "desk" ? "Phone" : "Computer"]));
-  nav.replaceChildren(...buttons);
+  if (phone) {
+    nav.replaceChildren(...buttons);
+    return;
+  }
+  nav.replaceChildren(
+    el("div", { class: "brand" }, [
+      el("strong", {}, ["Xahau"]),
+      el("span", {}, [shortAddress(account)]),
+    ]),
+    ...buttons,
+    el("button", {
+      class: "tab layout",
+      type: "button",
+      onclick: () => {
+        localStorage.setItem(SHELL_KEY, "phone");
+        location.reload();
+      },
+    }, ["Phone layout"]),
+  );
 }
 
 function route(id, account) {
@@ -584,7 +651,14 @@ function copyButton(text) {
         button.textContent = "Copy failed";
       }
     },
-  }, ["Copy address"]);
+  }, ["Copy"]);
+}
+
+function addressRow(account) {
+  return el("div", { class: "addr" }, [
+    el("span", { class: "mono" }, [account]),
+    copyButton(account),
+  ]);
 }
 
 function txList(rows) {
@@ -634,22 +708,28 @@ async function walletHome(account) {
     }
     if (gen !== viewGen) return;
     const balance = dropsToXah(info.account_data.Balance);
-    screen("Wallet", [
+    const stale = await pageIsStale(account);
+    if (gen !== viewGen) return;
+    const hero = [
       el("p", { class: "balance" }, [balance, el("span", {}, [" XAH"])]),
-      el("p", { class: "mono" }, [account]),
-      copyButton(account),
-      el("p", { class: "muted" }, [
-        shell() === "desk"
-          ? "A send on this computer shows a QR code. Scan it with the wallet on your iPhone."
-          : "Send with Face ID, or scan a QR code to sign a request from another screen.",
-      ]),
-      el("h2", {}, ["Recent"]),
+      addressRow(account),
+      stale ? updateBanner(account) : null,
+    ];
+    if (shell() === "desk") {
+      screen("Wallet", [
+        el("div", { class: "hero" }, hero.filter(Boolean)),
+        el("div", { class: "dash" }, [
+          el("section", { class: "card" }, [el("h2", {}, ["Activity"]), txList(rows)]),
+          el("section", { class: "card" }, [el("h2", {}, ["Receive"]), ...receiveParts(account)]),
+        ]),
+      ], "home");
+      return;
+    }
+    screen("Wallet", [
+      ...hero,
+      el("h2", {}, ["Activity"]),
       txList(rows),
-      el("button", {
-        class: "ghost",
-        type: "button",
-        onclick: () => republish(account, pwaUrl(account)).catch((error) => rejected(account, pwaUrl(account), error)),
-      }, ["Update the wallet page"]),
+      layoutSwitch(),
     ], "home");
   } catch (error) {
     if (gen !== viewGen) return;
@@ -679,14 +759,14 @@ function sendForm(account, dest = "", amount = "") {
   const note = el("p", { class: "muted" }, [""]);
   const go = el("button", { type: "button" }, [shell() === "desk" ? "Show QR for iPhone" : "Review"]);
   const back = safeReturn(params.get("return") || "", account);
-  screen("Send", [
-    el("p", { class: "mono" }, [account]),
+  const body = [
     destination,
     xah,
     note,
     go,
-    el("button", { class: "ghost", type: "button", onclick: () => composer({ account, back }) }, ["Other transactions"]),
-  ], "send");
+    el("button", { class: "link", type: "button", onclick: () => composer({ account, back }) }, ["Trust lines, escrow, and other types"]),
+  ];
+  screen("Send", shell() === "desk" ? [el("div", { class: "card form" }, body)] : body, "send");
   rpc("account_info", { account, ledger_index: "validated" }).then((info) => {
     note.textContent = `Available ${dropsToXah(info.account_data.Balance)} XAH`;
   }).catch(() => {});
@@ -695,8 +775,7 @@ function sendForm(account, dest = "", amount = "") {
   });
 }
 
-function receive(account) {
-  rememberAccount(account);
+function receiveParts(account) {
   const amount = el("input", {
     type: "text",
     inputMode: "decimal",
@@ -715,12 +794,21 @@ function receive(account) {
   };
   amount.addEventListener("input", paint);
   paint();
-  screen("Receive", [
-    el("p", { class: "muted" }, ["With no amount, the code is your address. Another wallet can scan it."]),
+  return [
     box,
-    el("p", { class: "mono" }, [account]),
-    copyButton(account),
-    amount,
+    el("div", { class: "receive-meta" }, [
+      el("p", { class: "muted" }, ["Leave the amount empty and the code is your address."]),
+      addressRow(account),
+      amount,
+    ]),
+  ];
+}
+
+function receive(account) {
+  rememberAccount(account);
+  const parts = receiveParts(account);
+  screen("Receive", [
+    shell() === "desk" ? el("div", { class: "split card" }, parts) : el("div", {}, parts),
   ], "receive");
 }
 
@@ -749,13 +837,13 @@ function handoff({ account, back, summary, url, watch, signHere }) {
   const status = el("p", { class: "muted" }, ["Waiting for your iPhone."]);
   const here = el("button", { class: "ghost", type: "button" }, ["Sign on this computer"]);
   screen("Scan with iPhone", [
-    el("p", {}, [summary]),
-    canvas,
-    el("p", { class: "muted" }, ["Open this wallet on the iPhone and tap Scan. The iPhone camera can open the code too."]),
+    el("p", { class: "lede" }, [summary]),
+    el("div", { class: "qrbox" }, [canvas]),
+    el("p", { class: "muted" }, ["Open this wallet on the iPhone and tap Scan."]),
     status,
     here,
     el("button", {
-      class: "ghost",
+      class: "link",
       type: "button",
       onclick: () => (back ? location.assign(back) : walletHome(account)),
     }, ["Cancel"]),
@@ -890,22 +978,32 @@ function scan(account) {
   const video = el("video", { autoplay: "true", muted: "true", playsinline: "true" });
   video.muted = true;
   video.setAttribute("playsinline", "");
-  const finder = el("div", { class: "finder" }, [video, el("div", { class: "reticle" })]);
+  const reticle = el("div", { class: "reticle" });
+  const finder = el("div", { class: "finder" }, [video, reticle]);
   const note = el("p", { class: "muted" }, ["Point the camera at a sign QR or an account address."]);
   const pasted = el("input", { type: "text", placeholder: "Or paste a link or address", autocomplete: "off", spellcheck: "false" });
-  const open = el("button", { class: "ghost", type: "button" }, ["Open pasted code"]);
-  screen("Scan", [finder, note, pasted, open], "scan");
+  const open = el("button", { class: "ghost", type: "button" }, ["Open"]);
+  const paste = el("div", { class: "paste" }, [pasted, open]);
+  screen("Scan", shell() === "desk"
+    ? [el("div", { class: "split scan-split" }, [finder, el("div", {}, [note, paste])])]
+    : [finder, note, paste], "scan");
   const gen = viewGen;
   open.addEventListener("click", () => {
     if (pasted.value.trim()) openScanned(pasted.value.trim());
   });
+  video.playsInline = true;
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   let stopped = false;
-  let timer = 0;
+  let frameHandle = 0;
+  let step = 0;
+  // Straight reads come first so focus can settle. A strong tilt gets one
+  // turned attempt after those, which still covers a phone held at an angle.
+  const turns = [0, 0, 20, 0, 0, -20];
   stopCamera = () => {
     stopped = true;
-    if (timer) clearInterval(timer);
+    if (frameHandle && video.cancelVideoFrameCallback) video.cancelVideoFrameCallback(frameHandle);
+    else if (frameHandle) cancelAnimationFrame(frameHandle);
     video.srcObject?.getTracks?.().forEach((track) => track.stop());
   };
   let detector = null;
@@ -914,40 +1012,135 @@ function scan(account) {
   } catch {
     detector = null;
   }
-  timer = setInterval(async () => {
-    if (stopped || gen !== viewGen || video.readyState < 2) return;
-    const maxEdge = 480;
-    const scale = Math.min(1, maxEdge / Math.max(video.videoWidth, video.videoHeight));
-    canvas.width = Math.max(21, Math.round(video.videoWidth * scale));
-    canvas.height = Math.max(21, Math.round(video.videoHeight * scale));
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    let text = "";
-    if (detector) {
-      try {
-        const codes = await detector.detect(canvas);
-        text = codes[0]?.rawValue || "";
-      } catch {
-        text = "";
+  const clamp = (x, y, w, h, vw, vh) => {
+    const x0 = Math.max(0, Math.round(x));
+    const y0 = Math.max(0, Math.round(y));
+    const x1 = Math.min(vw, Math.round(x + w));
+    const y1 = Math.min(vh, Math.round(y + h));
+    if (x1 - x0 < 21 || y1 - y0 < 21) return null;
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  };
+  // The preview covers the finder, so most of the camera frame is off screen.
+  // Sample the reticle the user is aiming with, in the camera's own pixels.
+  const guideRect = () => {
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) return null;
+    const box = video.getBoundingClientRect();
+    const mark = reticle.getBoundingClientRect();
+    if (box.width < 20 || mark.width < 20) {
+      const side = Math.round(Math.min(vw, vh) * 0.72);
+      return clamp((vw - side) / 2, (vh - side) / 2, side, side, vw, vh);
+    }
+    const scale = Math.max(box.width / vw, box.height / vh);
+    const offsetX = (box.width - vw * scale) / 2;
+    const offsetY = (box.height - vh * scale) / 2;
+    const grow = 0.22;
+    let w = mark.width / scale;
+    let h = mark.height / scale;
+    let x = (mark.left - box.left - offsetX) / scale - (w * grow) / 2;
+    let y = (mark.top - box.top - offsetY) / scale - (h * grow) / 2;
+    w *= 1 + grow;
+    h *= 1 + grow;
+    return clamp(x, y, w, h, vw, vh);
+  };
+  const readRect = (rect, turn, maxEdge) => {
+    const long = Math.max(rect.w, rect.h);
+    const scale = Math.min(1, maxEdge / long);
+    canvas.width = Math.max(21, Math.round(rect.w * scale));
+    canvas.height = Math.max(21, Math.round(rect.h * scale));
+    ctx.drawImage(video, rect.x, rect.y, rect.w, rect.h, 0, 0, canvas.width, canvas.height);
+    const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    return { text: decodeImage(frame.data, canvas.width, canvas.height, turn), shrunk: scale < 0.999 };
+  };
+  const again = () => {
+    if (stopped || gen !== viewGen) return;
+    if (video.requestVideoFrameCallback) frameHandle = video.requestVideoFrameCallback(tick);
+    else frameHandle = requestAnimationFrame(tick);
+  };
+  const tick = async () => {
+    if (stopped || gen !== viewGen) return;
+    try {
+      if (video.readyState >= 2) {
+        let text = "";
+        if (detector) {
+          try {
+            const codes = await detector.detect(video);
+            text = codes[0]?.rawValue || "";
+          } catch {
+            detector = null;
+          }
+        }
+        if (!text) {
+          const turn = turns[step % turns.length];
+          step += 1;
+          const guide = guideRect();
+          if (guide) {
+            const first = readRect(guide, turn, 640);
+            text = first.text;
+            // A tighter crop only adds detail when the guide was scaled down.
+            if (!text && first.shrunk) {
+              const tight = clamp(
+                guide.x + guide.w * 0.22,
+                guide.y + guide.h * 0.22,
+                guide.w * 0.56,
+                guide.h * 0.56,
+                video.videoWidth,
+                video.videoHeight,
+              );
+              if (tight) text = readRect(tight, turn, 640).text;
+            }
+          }
+        }
+        if (text && gen === viewGen) {
+          openScanned(text);
+          return;
+        }
       }
+    } catch {
+      // This frame failed. The next camera frame still runs.
     }
-    if (!text) {
-      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      text = decodeImage(frame.data, canvas.width, canvas.height);
-    }
-    if (text && gen === viewGen) openScanned(text);
-  }, 200);
-  navigator.mediaDevices?.getUserMedia?.({
-    audio: false,
-    video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
-  }).then((stream) => {
-    if (gen !== viewGen) {
-      stream.getTracks().forEach((track) => track.stop());
-      return;
-    }
-    video.srcObject = stream;
-  }).catch(() => {
-    if (gen === viewGen) note.textContent = "The camera is not available. Paste the link or the address instead.";
-  });
+    again();
+  };
+  const camera = {
+    facingMode: { ideal: "environment" },
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+  };
+  const devices = navigator.mediaDevices;
+  const getCamera = devices?.getUserMedia?.bind(devices);
+  if (!getCamera) {
+    note.textContent = "The camera is not available. Paste the link or the address instead.";
+    return;
+  }
+  const plain = { audio: false, video: { facingMode: camera.facingMode } };
+  const giveUp = (error) => error?.name === "NotAllowedError" || error?.name === "SecurityError" || error?.name === "NotFoundError";
+  const fallback = (next) => (error) => {
+    if (giveUp(error)) throw error;
+    return next();
+  };
+  getCamera({ audio: false, video: { ...camera, advanced: [{ focusMode: "continuous" }] } })
+    .catch(fallback(() => getCamera({ audio: false, video: camera })))
+    .catch(fallback(() => getCamera(plain)))
+    .then((stream) => {
+      if (gen !== viewGen) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      const track = stream.getVideoTracks?.()[0];
+      const caps = track?.getCapabilities?.() || {};
+      const advanced = {};
+      if (caps.focusMode?.includes("continuous")) advanced.focusMode = "continuous";
+      if (caps.exposureMode?.includes("continuous")) advanced.exposureMode = "continuous";
+      if (caps.whiteBalanceMode?.includes("continuous")) advanced.whiteBalanceMode = "continuous";
+      if (track && Object.keys(advanced).length) track.applyConstraints({ advanced: [advanced] }).catch(() => {});
+      video.srcObject = stream;
+      video.play?.().catch(() => {});
+      again();
+    })
+    .catch(() => {
+      if (gen === viewGen) note.textContent = "The camera is not available. Paste the link or the address instead.";
+    });
 }
 
 async function pay({ account, dest, xah, back }) {
@@ -973,33 +1166,36 @@ async function pay({ account, dest, xah, back }) {
 }
 
 function home() {
-  nav.hidden = true;
   const account = el("input", { type: "text", placeholder: "Account r…", autocomplete: "off", spellcheck: "false" });
   const seed = el("input", { type: "password", placeholder: "Family seed s…", autocomplete: "off", spellcheck: "false" });
   const lock = el("input", { type: "checkbox" });
   lock.checked = true;
-  const create = el("button", {}, ["Create a wallet and attach iPhone"]);
-  const sign = el("button", { class: "ghost" }, ["Open this account"]);
-  const update = el("button", { class: "ghost" }, ["Update the wallet page"]);
-  const use = el("button", { class: "ghost" }, ["Attach iPhone to this seed"]);
+  const create = el("button", {}, ["Create a wallet"]);
+  const sign = el("button", {}, ["Open"]);
+  const use = el("button", { class: "ghost" }, ["Attach passkey"]);
   const bad = originOk();
-  screen("Xahau wallet", [
-    el("p", {}, ["Your iPhone approves every send. On a computer the wallet shows a QR code. On the phone, scan one."]),
-    el("p", { class: "mono" }, [location.origin]),
-    bad ? el("p", { class: "warn" }, [bad]) : el("p", { class: "muted" }, [
+  const saved = savedAccount();
+  if (saved) account.value = saved;
+  screen("Wallet", [
+    el("p", { class: "lede" }, [
       shell() === "desk"
-        ? "This is the computer wallet. The iPhone scans the QR and uses Face ID."
-        : "This is the phone wallet. Face ID signs here, and Scan reads a QR from another screen.",
+        ? "A send shows a QR code. Your iPhone scans it and approves with Face ID."
+        : "Face ID approves each send. Scan reads a QR code from another screen.",
     ]),
+    bad ? el("p", { class: "warn" }, [bad]) : null,
     create,
-    el("p", { class: "muted" }, ["Sign with an account that already has this iPhone attached."]),
-    account,
-    sign,
-    update,
-    el("p", { class: "muted" }, ["Or attach a passkey to a wallet you already have."]),
-    seed,
-    el("label", {}, [lock, el("span", {}, ["Lock the hook. A lost passkey cannot be replaced, and the seed cannot take the hook off."])]),
-    use,
+    el("details", {}, [
+      el("summary", {}, ["I already have an account"]),
+      el("div", { class: "stack" }, [account, sign]),
+    ]),
+    el("details", {}, [
+      el("summary", {}, ["Attach a passkey to a seed"]),
+      el("div", { class: "stack" }, [
+        seed,
+        el("label", {}, [lock, el("span", {}, ["Lock the hook. A lost passkey cannot be replaced, and the seed cannot take the hook off."])]),
+        use,
+      ]),
+    ]),
   ]);
   sign.addEventListener("click", () => {
     const text = account.value.trim();
@@ -1009,15 +1205,6 @@ function home() {
     }
     rememberAccount(text);
     walletHome(text);
-  });
-  update.addEventListener("click", () => {
-    const text = account.value.trim();
-    if (!/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(text)) {
-      fail(new Error("enter the account address"));
-      return;
-    }
-    const back = safeReturn(params.get("return") || "", text) || pwaUrl(text);
-    republish(text, back).catch(fail);
   });
 
   create.addEventListener("click", async () => {

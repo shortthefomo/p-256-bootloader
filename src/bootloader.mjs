@@ -59,12 +59,25 @@ export function renderBootloader({ signer, vault = "", cid = "", spk = "" }) {
   ].filter(Boolean).join("");
   const css = pageAsset(signer, "wallet.css");
   const script = pageAsset(signer, "wallet.js");
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${metas}<title>Wallet</title><link rel="stylesheet" href=${jsString(css)}></head><body><main><h1>Wallet</h1>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="rev" content="2">${metas}<title>Wallet</title><link rel="stylesheet" href=${jsString(css)}></head><body><main><h1>Wallet</h1>
 <p class="m" id="intro">Your iPhone approves each send. A computer shows a QR code.</p>
 <p><code id="a"></code></p><p>Balance <b id="b">…</b></p><p id="g" class="m"></p><div id="d"></div><pre id="m" class="json"></pre>
 </main><script src=${jsString(script)} data-s=${jsString(signer)}></script></body></html>`;
   assertLoaderHtml(html);
   return html;
+}
+
+// The rev meta is "2". public/wallet.js shows Install update unless the
+// published page carries that same rev. Bump both together.
+// True only when this account already has a page and that page differs from
+// the one this signer would publish. A missing page is not an update.
+export function loaderChanged(published, fields) {
+  if (!published) return false;
+  try {
+    return published !== renderBootloader(fields);
+  } catch {
+    return false;
+  }
 }
 
 export function loaderHex(html) {

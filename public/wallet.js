@@ -57,6 +57,28 @@ const balanceLine = $("b").parentElement;
 balanceLine.className = "balance";
 balanceLine.replaceChildren($("b"), document.createTextNode(" XAH"));
 
+const frame = document.createElement("div");
+frame.id = "frame";
+const side = document.createElement("aside");
+side.className = "side";
+const stage = document.createElement("section");
+stage.className = "stage";
+const intro = $("intro") || document.querySelector("p.m:not(#g)");
+side.append.apply(side, [document.querySelector("h1"), intro, $("a").parentElement, balanceLine, $("g")].filter(Boolean));
+stage.append.apply(stage, [$("d"), $("m")].filter(Boolean));
+frame.append(side, stage);
+document.querySelector("main").replaceChildren(frame);
+
+// The published page carries this rev. A page without it, or with an older
+// one, still has the previous wallet and can install this one.
+if ((document.querySelector("meta[name=rev]") || {}).content !== "2") {
+  const update = document.createElement("a");
+  update.className = "b g";
+  update.href = href("update");
+  update.textContent = "Install update";
+  side.append(update);
+}
+
 const hash = new URLSearchParams(location.hash.slice(1));
 const txHash = hash.get("tx");
 if (hash.get("err")) showJson(hash.get("err"));
@@ -102,24 +124,14 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
     return;
   }
 
-  const tabs = document.createElement("nav");
-  tabs.className = "tabs";
   const sendPanel = panel("send");
   const receivePanel = panel("receive");
   const activityPanel = panel("activity");
-  function addTab(label, id, url) {
-    const button = document.createElement(url ? "a" : "button");
-    if (url) button.href = url;
-    else button.type = "button";
-    button.dataset.panel = id;
-    button.textContent = label;
-    if (!url) button.onclick = function () { show(id); };
-    tabs.append(button);
+  function heading(text) {
+    const h = document.createElement("h2");
+    h.textContent = text;
+    return h;
   }
-  addTab("Send", "send");
-  addTab("Receive", "receive");
-  addTab("Scan", "scan", href("scan"));
-  addTab("Activity", "activity");
 
   const destination = document.createElement("input");
   const amount = document.createElement("input");
@@ -149,7 +161,7 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
   other.className = "b g";
   other.href = href("sign");
   other.textContent = "Other transactions";
-  sendPanel.append(destination, amount, sign, other);
+  sendPanel.append(heading("Send"), destination, amount, sign, other);
 
   const receiveNote = document.createElement("p");
   receiveNote.className = "m";
@@ -162,12 +174,12 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
   scan.className = "b g";
   scan.href = href("scan");
   scan.textContent = "Scan a QR code";
-  receivePanel.append(receiveNote, receive, scan);
+  receivePanel.append(heading("Receive"), receiveNote, receive, scan);
 
   const activityNote = document.createElement("p");
   activityNote.className = "m";
   activityNote.textContent = "Loading activity…";
-  activityPanel.append(activityNote);
+  activityPanel.append(heading("Activity"), activityNote);
   rpc("account_tx", { account: acct, limit: 8 }).then(function (page) {
     const rows = page.transactions || [];
     activityNote.textContent = rows.length ? "" : "No transactions yet.";
@@ -186,6 +198,25 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
   const layout = document.createElement("div");
   layout.id = "layout";
   layout.append(sendPanel, receivePanel, activityPanel);
-  slot.append(tabs, layout);
-  show("send");
+  if (phone) {
+    const tabs = document.createElement("nav");
+    tabs.className = "tabs";
+    function addTab(label, id, url) {
+      const button = document.createElement(url ? "a" : "button");
+      if (url) button.href = url;
+      else button.type = "button";
+      button.dataset.panel = id;
+      button.textContent = label;
+      if (!url) button.onclick = function () { show(id); };
+      tabs.append(button);
+    }
+    addTab("Send", "send");
+    addTab("Receive", "receive");
+    addTab("Scan", "scan", href("scan"));
+    addTab("Activity", "activity");
+    slot.append(tabs, layout);
+    show("send");
+  } else {
+    slot.append(layout);
+  }
 }).catch(function () { $("g").textContent = "Hook state unavailable"; });

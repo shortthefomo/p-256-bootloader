@@ -703,7 +703,9 @@ function binarize(rgba, width, height) {
       integral[(y + 1) * (width + 1) + (x + 1)] = integral[y * (width + 1) + (x + 1)] + row;
     }
   }
-  const win = Math.max(8, (Math.min(width, height) / 8) | 0);
+  // A small window keeps a blurred screen code from being averaged into the
+  // background. The cap stops the window growing with the photo.
+  const win = Math.max(8, Math.min(32, (Math.min(width, height) / 16) | 0));
   const radius = win >> 1;
   const bin = new Uint8Array(width * height);
   for (let y = 0; y < height; y += 1) {
@@ -971,11 +973,34 @@ function scanBinary(bin, width, height) {
   return "";
 }
 
-export function decodeImage(rgba, width, height) {
+function rotateBin(bin, width, height, deg) {
+  const rad = deg * Math.PI / 180;
+  const c = Math.cos(rad);
+  const s = Math.sin(rad);
+  const hw = width / 2;
+  const hh = height / 2;
+  const out = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const dx = x - hw;
+      const dy = y - hh;
+      const sx = Math.round(c * dx + s * dy + hw);
+      const sy = Math.round(-s * dx + c * dy + hh);
+      if (sx < 0 || sy < 0 || sx >= width || sy >= height) continue;
+      out[y * width + x] = bin[sy * width + sx];
+    }
+  }
+  return out;
+}
+
+// `turn` rotates the thresholded image before the finder scan. The camera
+// tries a few angles across frames, so one frame stays cheap.
+export function decodeImage(rgba, width, height, turn = 0) {
   if (!rgba || width < 21 || height < 21) return "";
-  const scaled = downscale(rgba, width, height, 520);
+  const scaled = downscale(rgba, width, height, 640);
   try {
-    const bin = binarize(scaled.rgba, scaled.width, scaled.height);
+    let bin = binarize(scaled.rgba, scaled.width, scaled.height);
+    if (turn) bin = rotateBin(bin, scaled.width, scaled.height, turn);
     return scanBinary(bin, scaled.width, scaled.height);
   } catch {
     return "";
