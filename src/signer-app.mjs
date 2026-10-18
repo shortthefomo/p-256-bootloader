@@ -1,4 +1,14 @@
 import { renderBootloader } from "./bootloader.mjs";
+import { decodeImage, encodeQr } from "./qr.mjs";
+import {
+  describeTx,
+  isAddress,
+  parseScan,
+  payLink,
+  requestLink,
+  samePayment,
+  shortAddress,
+} from "./scan.mjs";
 import { TX_KINDS, transactionFromKind } from "./tx-forms.mjs";
 import {
   asciiHex,
@@ -40,8 +50,32 @@ import {
 
 const rpc = rpcSocket();
 const app = document.querySelector("#app");
+const nav = document.querySelector("#nav");
 const params = new URLSearchParams(location.search);
 const SEED_KEY = "p256-seed";
+const ACCOUNT_KEY = "p256-account";
+const SHELL_KEY = "p256-shell";
+let viewGen = 0;
+let stopCamera = () => {};
+
+function shell() {
+  return document.documentElement.dataset.shell === "desk" ? "desk" : "phone";
+}
+
+function applyShell() {
+  const saved = localStorage.getItem(SHELL_KEY);
+  const auto = window.matchMedia("(max-width: 860px), (pointer: coarse)").matches ? "phone" : "desk";
+  document.documentElement.dataset.shell = saved === "phone" || saved === "desk" ? saved : auto;
+}
+
+function savedAccount() {
+  const text = localStorage.getItem(ACCOUNT_KEY) || "";
+  return isAddress(text) ? text : "";
+}
+
+function rememberAccount(account) {
+  if (isAddress(account)) localStorage.setItem(ACCOUNT_KEY, account);
+}
 
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
@@ -54,8 +88,11 @@ function el(tag, attrs = {}, children = []) {
   return node;
 }
 
-function screen(title, nodes) {
+function screen(title, nodes, mode = "") {
+  stopCamera();
+  viewGen += 1;
   app.replaceChildren(el("h1", {}, [title]), ...nodes);
+  if (mode) renderNav(mode);
 }
 
 function say(parent, text, className = "muted") {
@@ -301,6 +338,7 @@ async function attach(seed, { account, lock }) {
   ]);
 
   sessionStorage.removeItem(SEED_KEY);
+  rememberAccount(wallet.address);
   screen("Wallet is live", [
     el("p", {}, ["This account now refuses a transaction the passkey did not approve."]),
     el("p", { class: "mono" }, [wallet.address]),
@@ -463,6 +501,10 @@ function composer({ account, back }) {
     const values = Object.fromEntries([...inputs].map(([key, input]) => [key, input.value]));
     try {
       const preview = transactionFromKind(kindSelect.value, values);
+      if (shell() === "desk") {
+        openBuilt({ account, kind: kindSelect.value, values, back }).catch((error) => rejected(account, back, error));
+        return;
+      }
       approve({
         account,
         back,
@@ -475,6 +517,439 @@ function composer({ account, back }) {
   });
 }
 
+function renderNav(active) {
+  const account = savedAccount();
+  if (!account) {
+    nav.hidden = true;
+    nav.replaceChildren();
+    return;
+  }
+  nav.hidden = false;
+  const items = shell() === "phone"
+    ? [["home", "Home"], ["send", "Send"], ["scan", "Scan"], ["receive", "Receive"]]
+    : [["home", "Home"], ["send", "Send"], ["receive", "Receive"], ["activity", "Activity"], ["scan", "Scan"]];
+  const buttons = items.map(([id, label]) => el("button", {
+    class: id === active ? "tab on" : "tab",
+    type: "button",
+    onclick: () => route(id, account),
+  }, [label]));
+  buttons.push(el("button", {
+    class: "tab",
+    type: "button",
+    onclick: () => {
+      localStorage.setItem(SHELL_KEY, shell() === "desk" ? "phone" : "desk");
+      location.reload();
+    },
+  }, [shell() === "desk" ? "Phone" : "Computer"]));
+  nav.replaceChildren(...buttons);
+}
+
+function route(id, account) {
+  if (id === "home") walletHome(account);
+  else if (id === "send") sendForm(account);
+  else if (id === "scan") scan(account);
+  else if (id === "receive") receive(account);
+  else activity(account);
+}
+
+function qrCanvas(text) {
+  const qr = encodeQr(text);
+  const quiet = 4;
+  const scale = 6;
+  const size = (qr.size + quiet * 2) * scale;
+  const canvas = el("canvas", { class: "qr", width: String(size), height: String(size) });
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = "#102117";
+  for (let row = 0; row < qr.size; row += 1) {
+    for (let col = 0; col < qr.size; col += 1) {
+      if (!qr.modules[row * qr.size + col]) continue;
+      ctx.fillRect((col + quiet) * scale, (row + quiet) * scale, scale, scale);
+    }
+  }
+  return canvas;
+}
+
+function copyButton(text) {
+  return el("button", {
+    class: "ghost",
+    type: "button",
+    onclick: async (event) => {
+      const button = event.currentTarget;
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = "Copied";
+      } catch {
+        button.textContent = "Copy failed";
+      }
+    },
+  }, ["Copy address"]);
+}
+
+function txList(rows) {
+  if (!rows.length) return el("p", { class: "muted" }, ["No transactions yet."]);
+  return el("div", {}, rows.map((row) => el("div", { class: "tx" }, [
+    el("b", {}, [row.line]),
+    el("span", { class: row.ok ? "muted" : "warn" }, [row.ok ? shortAddress(row.hash) : "Failed"]),
+  ])));
+}
+
+async function recent(account, limit) {
+  const page = await rpc("account_tx", { account, limit });
+  return (page.transactions || []).map(describeTx);
+}
+
+function askAccount(done) {
+  const input = el("input", { type: "text", placeholder: "Your account r…", autocomplete: "off", spellcheck: "false" });
+  const go = el("button", { type: "button" }, ["Continue"]);
+  screen("Which wallet pays?", [
+    el("p", { class: "muted" }, ["This code names the payment. Enter the account this iPhone approves."]),
+    input,
+    go,
+  ]);
+  go.addEventListener("click", () => {
+    const account = input.value.trim();
+    if (!isAddress(account)) {
+      fail(new Error("enter the account address"));
+      return;
+    }
+    rememberAccount(account);
+    done(account);
+  });
+}
+
+async function walletHome(account) {
+  rememberAccount(account);
+  screen("Wallet", [el("p", { class: "muted" }, ["Loading the account…"])], "home");
+  const gen = viewGen;
+  try {
+    const info = await rpc("account_info", { account, ledger_index: "validated" });
+    if (gen !== viewGen) return;
+    let rows = [];
+    try {
+      rows = await recent(account, 6);
+    } catch {
+      rows = [];
+    }
+    if (gen !== viewGen) return;
+    const balance = dropsToXah(info.account_data.Balance);
+    screen("Wallet", [
+      el("p", { class: "balance" }, [balance, el("span", {}, [" XAH"])]),
+      el("p", { class: "mono" }, [account]),
+      copyButton(account),
+      el("p", { class: "muted" }, [
+        shell() === "desk"
+          ? "A send on this computer shows a QR code. Scan it with the wallet on your iPhone."
+          : "Send with Face ID, or scan a QR code to sign a request from another screen.",
+      ]),
+      el("h2", {}, ["Recent"]),
+      txList(rows),
+      el("button", {
+        class: "ghost",
+        type: "button",
+        onclick: () => republish(account, pwaUrl(account)).catch((error) => rejected(account, pwaUrl(account), error)),
+      }, ["Update the wallet page"]),
+    ], "home");
+  } catch (error) {
+    if (gen !== viewGen) return;
+    screen("Wallet", [
+      el("p", {}, [error.message || String(error)]),
+      el("button", { class: "ghost", type: "button", onclick: () => home() }, ["Use a different account"]),
+    ], "home");
+  }
+}
+
+function sendForm(account, dest = "", amount = "") {
+  rememberAccount(account);
+  const destination = el("input", {
+    type: "text",
+    placeholder: "Destination r…",
+    autocomplete: "off",
+    spellcheck: "false",
+    value: dest,
+  });
+  const xah = el("input", {
+    type: "text",
+    inputMode: "decimal",
+    placeholder: "Amount XAH",
+    autocomplete: "off",
+    value: amount,
+  });
+  const note = el("p", { class: "muted" }, [""]);
+  const go = el("button", { type: "button" }, [shell() === "desk" ? "Show QR for iPhone" : "Review"]);
+  const back = safeReturn(params.get("return") || "", account);
+  screen("Send", [
+    el("p", { class: "mono" }, [account]),
+    destination,
+    xah,
+    note,
+    go,
+    el("button", { class: "ghost", type: "button", onclick: () => composer({ account, back }) }, ["Other transactions"]),
+  ], "send");
+  rpc("account_info", { account, ledger_index: "validated" }).then((info) => {
+    note.textContent = `Available ${dropsToXah(info.account_data.Balance)} XAH`;
+  }).catch(() => {});
+  go.addEventListener("click", () => {
+    pay({ account, dest: destination.value.trim(), xah: xah.value.trim(), back }).catch((error) => rejected(account, back, error));
+  });
+}
+
+function receive(account) {
+  rememberAccount(account);
+  const amount = el("input", {
+    type: "text",
+    inputMode: "decimal",
+    placeholder: "Request amount, optional",
+    autocomplete: "off",
+  });
+  const box = el("div", { class: "qrbox" });
+  const paint = () => {
+    const xah = amount.value.trim();
+    const text = xah ? payLink({ page: location.href, dest: account, xah }) : account;
+    try {
+      box.replaceChildren(qrCanvas(text));
+    } catch (error) {
+      box.replaceChildren(el("p", { class: "warn" }, [error.message]));
+    }
+  };
+  amount.addEventListener("input", paint);
+  paint();
+  screen("Receive", [
+    el("p", { class: "muted" }, ["With no amount, the code is your address. Another wallet can scan it."]),
+    box,
+    el("p", { class: "mono" }, [account]),
+    copyButton(account),
+    amount,
+  ], "receive");
+}
+
+async function activity(account) {
+  rememberAccount(account);
+  screen("Activity", [el("p", { class: "muted" }, ["Loading…"])], "activity");
+  const gen = viewGen;
+  try {
+    const rows = await recent(account, 15);
+    if (gen !== viewGen) return;
+    screen("Activity", [txList(rows)], "activity");
+  } catch (error) {
+    if (gen !== viewGen) return;
+    screen("Activity", [el("p", {}, [error.message || String(error)])], "activity");
+  }
+}
+
+function handoff({ account, back, summary, url, watch, signHere }) {
+  let canvas;
+  try {
+    canvas = qrCanvas(url);
+  } catch (error) {
+    rejected(account, back, error);
+    return;
+  }
+  const status = el("p", { class: "muted" }, ["Waiting for your iPhone."]);
+  const here = el("button", { class: "ghost", type: "button" }, ["Sign on this computer"]);
+  screen("Scan with iPhone", [
+    el("p", {}, [summary]),
+    canvas,
+    el("p", { class: "muted" }, ["Open this wallet on the iPhone and tap Scan. The iPhone camera can open the code too."]),
+    status,
+    here,
+    el("button", {
+      class: "ghost",
+      type: "button",
+      onclick: () => (back ? location.assign(back) : walletHome(account)),
+    }, ["Cancel"]),
+  ]);
+  const gen = viewGen;
+  here.addEventListener("click", () => {
+    if (gen === viewGen) signHere();
+  });
+  if (watch) watchPayment({ account, back, gen, status, watch }).catch(() => {});
+}
+
+async function watchPayment({ account, back, gen, status, watch }) {
+  const seen = new Set();
+  try {
+    for (const row of await recent(account, 20)) if (row.hash) seen.add(row.hash);
+  } catch {
+    // The first poll still notices a new transaction.
+  }
+  if (gen !== viewGen) return;
+  for (let i = 0; i < 80 && gen === viewGen; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    if (gen !== viewGen) return;
+    try {
+      const hit = (await recent(account, 8)).find((row) => row.hash && !seen.has(row.hash) && matchesWatch(row, account, watch));
+      if (hit) {
+        sent(account, back, hit.hash, { hash: hit.hash, result: "tesSUCCESS" });
+        return;
+      }
+    } catch {
+      if (gen === viewGen) status.textContent = "Still waiting. The network did not answer just now.";
+    }
+  }
+}
+
+function matchesWatch(row, account, watch) {
+  if (!row.ok) return false;
+  if (watch.any) return row.account === account;
+  return samePayment(row, watch);
+}
+
+async function openBuilt({ account, kind, values, back }) {
+  if (!isAddress(account)) {
+    askAccount((chosen) => {
+      openBuilt({ account: chosen, kind, values, back: safeReturn(back || "", chosen) }).catch((error) => rejected(chosen, null, error));
+    });
+    return;
+  }
+  rememberAccount(account);
+  const preview = transactionFromKind(kind, values);
+  const signHere = () => approve({
+    account,
+    back,
+    needsPublicKey: !preview.payment,
+    make: () => transactionFromKind(kind, values),
+  }).catch((error) => rejected(account, back, error));
+  if (shell() === "phone") {
+    await signHere();
+    return;
+  }
+  handoff({
+    account,
+    back,
+    summary: preview.summary,
+    url: requestLink({ page: location.href, account, kind, values, returnTo: back || "" }),
+    watch: preview.payment
+      ? { dest: preview.payment.destination, drops: preview.payment.drops }
+      : { any: true },
+    signHere,
+  });
+}
+
+function openScanned(text) {
+  const found = parseScan(text);
+  if (found.type === "address") {
+    const account = savedAccount();
+    if (!account) {
+      askAccount((chosen) => sendForm(chosen, found.address));
+      return;
+    }
+    sendForm(account, found.address);
+    return;
+  }
+  if (found.type === "pay") {
+    const start = (account) => {
+      pay({
+        account,
+        dest: found.dest,
+        xah: found.xah,
+        back: safeReturn(found.returnTo, account),
+      }).catch((error) => rejected(account, safeReturn(found.returnTo, account), error));
+    };
+    const account = found.account || savedAccount();
+    if (!account) {
+      askAccount(start);
+      return;
+    }
+    start(account);
+    return;
+  }
+  if (found.type === "qr") {
+    const account = found.account || savedAccount();
+    openBuilt({
+      account,
+      kind: found.kind,
+      values: found.values,
+      back: account ? safeReturn(found.returnTo, account) : null,
+    }).catch((error) => fail(error));
+    return;
+  }
+  if (found.type === "sign") {
+    const account = found.account || savedAccount();
+    if (!account) {
+      askAccount((chosen) => composer({ account: chosen, back: null }));
+      return;
+    }
+    composer({ account, back: safeReturn(params.get("return") || "", account) });
+    return;
+  }
+  const again = savedAccount();
+  screen(found.type === "xaman-payload" ? "Xaman keeps this request" : "This code is not a payment", [
+    el("p", {}, [
+      found.type === "xaman-payload"
+        ? "This QR points at a sign request stored by Xaman. This wallet signs its own codes, an address, or a Xaman detect link."
+        : "Scan an address, a sign QR from this wallet, or a Xaman detect link.",
+    ]),
+    again ? el("button", { class: "ghost", type: "button", onclick: () => scan(again) }, ["Scan again"]) : el("button", { class: "ghost", type: "button", onclick: () => home() }, ["Back"]),
+  ], again ? "scan" : "");
+}
+
+function scan(account) {
+  if (isAddress(account)) rememberAccount(account);
+  const video = el("video", { autoplay: "true", muted: "true", playsinline: "true" });
+  video.muted = true;
+  video.setAttribute("playsinline", "");
+  const finder = el("div", { class: "finder" }, [video, el("div", { class: "reticle" })]);
+  const note = el("p", { class: "muted" }, ["Point the camera at a sign QR or an account address."]);
+  const pasted = el("input", { type: "text", placeholder: "Or paste a link or address", autocomplete: "off", spellcheck: "false" });
+  const open = el("button", { class: "ghost", type: "button" }, ["Open pasted code"]);
+  screen("Scan", [finder, note, pasted, open], "scan");
+  const gen = viewGen;
+  open.addEventListener("click", () => {
+    if (pasted.value.trim()) openScanned(pasted.value.trim());
+  });
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  let stopped = false;
+  let timer = 0;
+  stopCamera = () => {
+    stopped = true;
+    if (timer) clearInterval(timer);
+    video.srcObject?.getTracks?.().forEach((track) => track.stop());
+  };
+  let detector = null;
+  try {
+    if ("BarcodeDetector" in globalThis) detector = new BarcodeDetector({ formats: ["qr_code"] });
+  } catch {
+    detector = null;
+  }
+  timer = setInterval(async () => {
+    if (stopped || gen !== viewGen || video.readyState < 2) return;
+    const maxEdge = 480;
+    const scale = Math.min(1, maxEdge / Math.max(video.videoWidth, video.videoHeight));
+    canvas.width = Math.max(21, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(21, Math.round(video.videoHeight * scale));
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    let text = "";
+    if (detector) {
+      try {
+        const codes = await detector.detect(canvas);
+        text = codes[0]?.rawValue || "";
+      } catch {
+        text = "";
+      }
+    }
+    if (!text) {
+      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      text = decodeImage(frame.data, canvas.width, canvas.height);
+    }
+    if (text && gen === viewGen) openScanned(text);
+  }, 200);
+  navigator.mediaDevices?.getUserMedia?.({
+    audio: false,
+    video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+  }).then((stream) => {
+    if (gen !== viewGen) {
+      stream.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    video.srcObject = stream;
+  }).catch(() => {
+    if (gen === viewGen) note.textContent = "The camera is not available. Paste the link or the address instead.";
+  });
+}
+
 async function pay({ account, dest, xah, back }) {
   const drops = xahToDrops(xah);
   const info = await rpc("account_info", { account, ledger_index: "validated" });
@@ -483,24 +958,38 @@ async function pay({ account, dest, xah, back }) {
     throw new Error(`balance is ${dropsToXah(balance)} XAH. This send needs ${dropsToXah(drops + BigInt(HOOK_FEE))} including the fee.`);
   }
   const made = transactionFromKind("Payment", { destination: dest, xah });
+  if (shell() === "desk") {
+    handoff({
+      account,
+      back,
+      summary: made.summary,
+      url: payLink({ page: location.href, account, dest, xah, returnTo: back || "" }),
+      watch: { dest, drops: made.payment.drops },
+      signHere: () => approve({ account, back, needsPublicKey: false, make: () => made }).catch((error) => rejected(account, back, error)),
+    });
+    return;
+  }
   await approve({ account, back, needsPublicKey: false, make: () => made });
 }
 
 function home() {
+  nav.hidden = true;
   const account = el("input", { type: "text", placeholder: "Account r…", autocomplete: "off", spellcheck: "false" });
   const seed = el("input", { type: "password", placeholder: "Family seed s…", autocomplete: "off", spellcheck: "false" });
   const lock = el("input", { type: "checkbox" });
   lock.checked = true;
   const create = el("button", {}, ["Create a wallet and attach iPhone"]);
-  const sign = el("button", { class: "ghost" }, ["Sign a transaction"]);
+  const sign = el("button", { class: "ghost" }, ["Open this account"]);
   const update = el("button", { class: "ghost" }, ["Update the wallet page"]);
   const use = el("button", { class: "ghost" }, ["Attach iPhone to this seed"]);
   const bad = originOk();
   screen("Xahau wallet", [
-    el("p", {}, ["This page builds a transaction, your iPhone signs it with Face ID, and the firewall hook on the account accepts or rejects it."]),
+    el("p", {}, ["Your iPhone approves every send. On a computer the wallet shows a QR code. On the phone, scan one."]),
     el("p", { class: "mono" }, [location.origin]),
     bad ? el("p", { class: "warn" }, [bad]) : el("p", { class: "muted" }, [
-      "On a computer, choose the iPhone in the passkey prompt. On the phone, use Face ID.",
+      shell() === "desk"
+        ? "This is the computer wallet. The iPhone scans the QR and uses Face ID."
+        : "This is the phone wallet. Face ID signs here, and Scan reads a QR from another screen.",
     ]),
     create,
     el("p", { class: "muted" }, ["Sign with an account that already has this iPhone attached."]),
@@ -518,7 +1007,8 @@ function home() {
       fail(new Error("enter the account address"));
       return;
     }
-    composer({ account: text, back: safeReturn(params.get("return") || "", text) });
+    rememberAccount(text);
+    walletHome(text);
   });
   update.addEventListener("click", () => {
     const text = account.value.trim();
@@ -568,23 +1058,60 @@ function fail(error) {
 }
 
 async function main() {
+  applyShell();
   if (!globalThis.XrplAccountLib) {
     screen("Signer is incomplete", [el("p", {}, ["The signing library did not load."])]);
     return;
   }
-  if (!globalThis.PublicKeyCredential) {
-    screen("No passkeys here", [el("p", {}, ["This browser has no WebAuthn. Open the signer in Safari on the iPhone, or in Chrome or Safari on a computer that can reach the phone."])]);
+  if (!globalThis.PublicKeyCredential && shell() === "phone") {
+    screen("No passkeys here", [el("p", {}, ["This browser has no WebAuthn. Open the wallet in Safari on the iPhone."])]);
     return;
   }
   const op = params.get("op");
   try {
+    if (op === "qr") {
+      const found = parseScan(location.href);
+      if (found.type !== "qr") throw new Error("this sign QR is not valid");
+      const account = found.account || savedAccount();
+      await openBuilt({
+        account,
+        kind: found.kind,
+        values: found.values,
+        back: account ? safeReturn(found.returnTo, account) : null,
+      });
+      return;
+    }
+    if (op === "scan") {
+      const account = params.get("account") || savedAccount();
+      if (isAddress(account)) rememberAccount(account);
+      scan(account);
+      return;
+    }
+    if (op === "receive") {
+      const account = params.get("account") || savedAccount();
+      if (!isAddress(account)) {
+        home();
+        return;
+      }
+      receive(account);
+      return;
+    }
     if (op === "pay") {
-      const account = params.get("account") || "";
       const dest = params.get("dest") || "";
       const xah = params.get("xah") || "";
-      const back = safeReturn(params.get("return") || "", account);
-      if (!account || !dest) throw new Error("the wallet did not name an account and a destination");
-      await pay({ account, dest, xah, back });
+      if (!dest) throw new Error("the wallet did not name a destination");
+      const start = (account) => pay({
+        account,
+        dest,
+        xah,
+        back: safeReturn(params.get("return") || "", account),
+      });
+      const account = params.get("account") || savedAccount();
+      if (!account) {
+        askAccount((chosen) => start(chosen).catch((error) => rejected(chosen, null, error)));
+        return;
+      }
+      await start(account);
       return;
     }
     if (op === "sign") {
@@ -604,6 +1131,12 @@ async function main() {
         return;
       }
       await attach(existing, { account: params.get("account") || "", lock: true });
+      return;
+    }
+    const known = params.get("account") || savedAccount();
+    if (isAddress(known)) {
+      rememberAccount(known);
+      walletHome(known);
       return;
     }
     home();

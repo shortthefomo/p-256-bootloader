@@ -21,6 +21,8 @@ import {
   softwarePasskey,
   xahToDrops,
 } from "../src/protocol.mjs";
+import { decodeImage, decodeQr, encodeQr, rasterQr } from "../src/qr.mjs";
+import { kindFromTx, parseScan, payLink, requestLink, samePayment } from "../src/scan.mjs";
 import { HOOK_ON, NAMESPACE, accountBytes, safeReturn, stateValue } from "../src/wallet.mjs";
 import { generate, libraries } from "xrpl-accountlib";
 
@@ -133,6 +135,50 @@ check("namespace key matches a right-aligned PX", stateValue({ namespace_entries
 const fresh = generate.familySeed();
 const decoded = accountBytes({ libraries }, fresh.address);
 check("account id is 20 bytes", decoded.length === 20, fresh.address);
+
+const signText = payLink({
+  page: "https://shortthefomo.github.io/p-256-bootloader/?old=1",
+  account,
+  dest: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+  xah: "1.5",
+});
+const qr = encodeQr(signText);
+check("qr matrix roundtrip", decodeQr(qr.modules, qr.size) === signText, `v${qr.version}`);
+const damaged = new Uint8Array(qr.modules);
+damaged[qr.size * qr.size - 1] ^= 1;
+damaged[qr.size * (qr.size - 1) - 3] ^= 1;
+check("qr repairs two bad modules", decodeQr(damaged, qr.size) === signText);
+const raster = rasterQr(signText, 4, 4);
+check("qr image roundtrip", decodeImage(raster.rgba, raster.width, raster.height) === signText);
+const longText = "https://wallet.example/sign?" + "a".repeat(240);
+const longQr = encodeQr(longText);
+check("long qr roundtrip", decodeQr(longQr.modules, longQr.size) === longText && longQr.version > 8);
+
+const parsedPay = parseScan(signText);
+check("scan reads a pay link", parsedPay.type === "pay" && parsedPay.xah === "1.5" && parsedPay.account === account);
+check("scan reads an address", parseScan(account).type === "address");
+const request = requestLink({
+  page: "https://shortthefomo.github.io/p-256-bootloader/",
+  account,
+  kind: "TrustSet",
+  values: { issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh", currency: "USD", limit: "100" },
+});
+const parsedRequest = parseScan(request);
+check("scan reads a sign request", parsedRequest.type === "qr" && parsedRequest.kind === "TrustSet" && parsedRequest.values.limit === "100");
+const detect = `https://xaman.app/detect/${Buffer.from(JSON.stringify({
+  TransactionType: "Payment",
+  Destination: account,
+  Amount: "2500000",
+})).toString("hex")}`;
+const parsedDetect = parseScan(detect);
+check("scan reads a xaman detect payment", parsedDetect.kind === "Payment" && parsedDetect.values.xah === "2.5");
+check("xaman payload is not fetched", parseScan("https://xumm.app/sign/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee").type === "xaman-payload");
+check("scan ignores another site", parseScan("https://evil.example/steal").type === "unknown");
+check("kind from trustset", kindFromTx({ TransactionType: "TrustSet", LimitAmount: { currency: "USD", issuer: account, value: "5" } })?.kind === "TrustSet");
+check("payment watch matches drops", samePayment(
+  { ok: true, hash: "abc", type: "Payment", destination: account, amount: "1500000" },
+  { dest: account, drops: 1500000n },
+));
 
 if (failed) {
   console.log(`${failed} failed`);

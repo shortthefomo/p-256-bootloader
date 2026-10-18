@@ -22,13 +22,14 @@ The stored origin has to be https and 8 to 64 characters.
 
 ## Wallet
 
-This repository is the wallet. GitHub Pages serves it. The page builds a transaction, Face ID signs it, and the firewall hook on the account accepts or rejects the submission. The on-ledger bootloader is the account page. Its sign button opens this wallet and returns when the transaction is in a ledger.
+This repository is the wallet. GitHub Pages serves it. A phone lays out as a wallet with Home, Send, Scan, and Receive. A computer lays out as a wallet that shows a QR code. The iPhone scans that code, Face ID signs, and the firewall hook on the account accepts or rejects the submission. The on-ledger bootloader is the account page. Its sign button opens this wallet and returns when the transaction is in a ledger.
 
 Push the repository to GitHub and turn on Pages (the `pages` workflow publishes the site). The site origin, such as `https://shortthefomo.github.io`, must be 64 characters or fewer. `github.io` is a public suffix, so the passkey belongs to that full host. Open the Pages URL in Safari on the iPhone.
 
 - **Create a wallet and attach iPhone** funds a new account from the faucet, shows the seed once, then opens the passkey prompt.
 - The wallet installs the hook with that iPhone public key, publishes the bootloader pointed at this same URL, and sets the level.
 - **Lock the hook** (level 3) means a lost passkey locks the account. The seed cannot remove the hook. Leave it off for level 2: payments and account changes still need the phone, and `SetHook` can still remove the hook.
+- **Open this account** shows the balance, recent activity, send, and receive. On a computer, send shows a QR code for the iPhone. On the phone, Face ID signs, and Scan reads a QR from the computer, an address, or a Xaman detect link.
 - **Sign a transaction** builds a payment, trust line, offer, escrow, check, domain change, regular key, preauthorization, tickets, invoke, or account delete. Face ID signs it and the wallet submits it.
 
 The bootloader then lives at `https://pwa.passkey.xahau-dev.net/<account>`. A payment there comes back here. **Other transactions** opens the full form. Open the wallet at https://shortthefomo.github.io/p-256-bootloader/.

@@ -41,6 +41,13 @@ function showJson(text) {
   m.textContent = pretty;
 }
 
+const phone = window.matchMedia("(max-width: 860px)").matches;
+document.documentElement.dataset.shell = phone ? "phone" : "desk";
+
+const balanceLine = $("b").parentElement;
+balanceLine.className = "balance";
+balanceLine.replaceChildren($("b"), document.createTextNode(" XAH"));
+
 const hash = new URLSearchParams(location.hash.slice(1));
 const txHash = hash.get("tx");
 if (hash.get("err")) showJson(hash.get("err"));
@@ -52,8 +59,22 @@ else if (txHash) {
 }
 
 rpc("account_info", { account: acct, ledger_index: "validated" }).then(function (info) {
-  $("b").textContent = xah(info.account_data.Balance) + " XAH";
+  $("b").textContent = xah(info.account_data.Balance);
 }).catch(function (error) { m.textContent = error.message; });
+
+function panel(id) {
+  const node = document.createElement("div");
+  node.className = "panel";
+  node.id = id;
+  return node;
+}
+
+function show(which) {
+  const panels = document.querySelectorAll(".panel");
+  for (let i = 0; i < panels.length; i++) panels[i].classList.toggle("on", panels[i].id === which);
+  const tabs = document.querySelectorAll("nav.tabs button");
+  for (let i = 0; i < tabs.length; i++) tabs[i].classList.toggle("on", tabs[i].dataset.panel === which);
+}
 
 rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index: "validated" }).then(function (ns) {
   const entries = ns.namespace_entries || ns.namespaceEntries || [];
@@ -61,7 +82,7 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
     const key = (entry.HookStateKey || "").toUpperCase();
     return (key === "5058".padStart(64, "0") || key.slice(0, 4) === "5058") && (entry.HookStateData || "").length == 64;
   });
-  $("g").textContent = passkey ? "Passkey on. Sends need your iPhone." : "No passkey yet.";
+  $("g").textContent = passkey ? "Passkey on. The iPhone approves each send." : "No passkey yet.";
   const slot = $("d");
   if (!passkey) {
     const attach = document.createElement("a");
@@ -72,13 +93,34 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
     slot.append(attach);
     return;
   }
+
+  const tabs = document.createElement("nav");
+  tabs.className = "tabs";
+  const sendPanel = panel("send");
+  const receivePanel = panel("receive");
+  const activityPanel = panel("activity");
+  function addTab(label, id) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.panel = id;
+    button.textContent = label;
+    button.onclick = function () { show(id); };
+    tabs.append(button);
+  }
+  addTab("Send", "send");
+  addTab("Receive", "receive");
+  addTab("Scan", "scan");
+  addTab("Activity", "activity");
+  const scanTab = tabs.lastChild.previousSibling;
+  scanTab.onclick = function () { go("scan"); };
+
   const destination = document.createElement("input");
   const amount = document.createElement("input");
   const sign = document.createElement("button");
   destination.placeholder = "Destination r...";
   amount.placeholder = "Amount XAH";
   amount.inputMode = "decimal";
-  sign.textContent = "Sign with iPhone";
+  sign.textContent = phone ? "Sign with Face ID" : "Show QR for iPhone";
   sign.onclick = function () {
     const value = amount.value.trim();
     if (!/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(destination.value.trim())) {
@@ -96,5 +138,43 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
   other.href = "#";
   other.textContent = "Other transactions";
   other.onclick = function (event) { event.preventDefault(); go("sign"); };
-  slot.append(destination, amount, sign, other);
+  sendPanel.append(destination, amount, sign, other);
+
+  const receiveNote = document.createElement("p");
+  receiveNote.className = "m";
+  receiveNote.textContent = "Show a QR code for this address.";
+  const receive = document.createElement("button");
+  receive.textContent = "Show my QR";
+  receive.onclick = function () { go("receive"); };
+  const scan = document.createElement("a");
+  scan.className = "b g";
+  scan.href = "#";
+  scan.textContent = "Scan a QR code";
+  scan.onclick = function (event) { event.preventDefault(); go("scan"); };
+  receivePanel.append(receiveNote, receive, scan);
+
+  const activityNote = document.createElement("p");
+  activityNote.className = "m";
+  activityNote.textContent = "Loading activity…";
+  activityPanel.append(activityNote);
+  rpc("account_tx", { account: acct, limit: 8 }).then(function (page) {
+    const rows = page.transactions || [];
+    activityNote.textContent = rows.length ? "" : "No transactions yet.";
+    rows.forEach(function (entry) {
+      const tx = entry.tx_json || entry.tx || {};
+      const line = document.createElement("div");
+      line.className = "tx";
+      let text = tx.TransactionType || "Transaction";
+      if (text === "Payment" && typeof tx.Amount === "string") text = xah(tx.Amount) + " XAH";
+      if (tx.Destination) text += " → " + tx.Destination.slice(0, 6) + "…" + tx.Destination.slice(-4);
+      line.textContent = text;
+      activityPanel.append(line);
+    });
+  }).catch(function () { activityNote.textContent = "Activity is unavailable."; });
+
+  const layout = document.createElement("div");
+  layout.id = "layout";
+  layout.append(sendPanel, receivePanel, activityPanel);
+  slot.append(tabs, layout);
+  show("send");
 }).catch(function () { $("g").textContent = "Hook state unavailable"; });

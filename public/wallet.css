@@ -41,3 +41,32 @@ pre.json {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.balance { font-size: 2rem; font-weight: 700; margin: .2rem 0; }
+nav.tabs { display: flex; gap: .35rem; margin: .4rem 0 1rem; }
+nav.tabs button {
+  width: auto;
+  flex: 1;
+  margin: 0;
+  padding: .7rem .3rem;
+  background: transparent;
+  color: #8dffc1;
+  border: 1px solid #245c40;
+}
+nav.tabs button.on { background: #8dffc1; color: #042; }
+.tx { padding: .55rem 0; border-top: 1px solid #2a2a2a; }
+html[data-shell="phone"] main { padding-bottom: 5.5rem; }
+html[data-shell="phone"] nav.tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: .4rem .4rem calc(.45rem + env(safe-area-inset-bottom));
+  background: #111;
+  border-top: 1px solid #245c40;
+}
+html[data-shell="phone"] .panel { display: none; }
+html[data-shell="phone"] .panel.on { display: block; }
+html[data-shell="desk"] main { max-width: 58rem; }
+html[data-shell="desk"] #layout { display: grid; grid-template-columns: 18rem 1fr; gap: 1rem 1.5rem; align-items: start; }
+html[data-shell="desk"] nav.tabs { display: none; }

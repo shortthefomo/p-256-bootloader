@@ -60,7 +60,7 @@ export function renderBootloader({ signer, vault = "", cid = "", spk = "" }) {
   const css = pageAsset(signer, "wallet.css");
   const script = pageAsset(signer, "wallet.js");
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${metas}<title>Wallet</title><link rel="stylesheet" href=${jsString(css)}></head><body><main><h1>Wallet</h1>
-<p class="m">Sends need your iPhone. The hook checks that passkey.</p>
+<p class="m" id="intro">Your iPhone approves each send. A computer shows a QR code.</p>
 <p><code id="a"></code></p><p>Balance <b id="b">…</b></p><p id="g" class="m"></p><div id="d"></div><pre id="m" class="json"></pre>
 </main><script src=${jsString(script)} data-s=${jsString(signer)}></script></body></html>`;
   assertLoaderHtml(html);
