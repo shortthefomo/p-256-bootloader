@@ -12,7 +12,6 @@ import {
 import { TX_KINDS, transactionFromKind } from "./tx-forms.mjs";
 import {
   asciiHex,
-  base64url,
   bytesToHex,
   derToRaw,
   dropsToXah,
@@ -187,31 +186,6 @@ async function createPasskey(address, accountId, salt) {
   });
   if (!credential) throw new Error("no passkey was created");
   return credential;
-}
-
-function passkeyLabel(summary) {
-  const chars = [...String(summary || "Xahau transaction").replace(/\s+/g, " ").trim()];
-  const encode = new TextEncoder();
-  while (chars.length && encode.encode(chars.join("")).length > 64) chars.pop();
-  return chars.join("").trim() || "Xahau transaction";
-}
-
-// The system sheet titles itself with the website. The passkey name is the
-// transaction being approved, and it is put back to the account afterwards.
-async function labelPasskey(accountId, label) {
-  const signal = globalThis.PublicKeyCredential?.signalCurrentUserDetails;
-  if (typeof signal !== "function") return;
-  const text = passkeyLabel(label);
-  try {
-    await signal.call(globalThis.PublicKeyCredential, {
-      rpId: location.hostname,
-      userId: base64url(accountId),
-      name: text,
-      displayName: text,
-    });
-  } catch {
-    // The sheet still opens when the name cannot be updated.
-  }
 }
 
 async function getPasskey(challenge, salt, credentialId) {
@@ -424,9 +398,15 @@ async function loadAccount(account) {
 
 function sent(account, back, hash, result) {
   const next = back || pwaUrl(account);
-  const pre = el("pre", { class: "json" }, [JSON.stringify(result, null, 2)]);
   const backBtn = el("button", { onclick: () => location.assign(`${next}#tx=${hash}`) }, ["Back to wallet"]);
-  screen("Result", [pre, backBtn]);
+  screen("Result", [
+    el("p", {}, ["Sent."]),
+    el("details", { class: "raw" }, [
+      el("summary", {}, ["Details"]),
+      el("pre", { class: "json" }, [JSON.stringify(result, null, 2)]),
+    ]),
+    backBtn,
+  ]);
 }
 
 function txJson(prepared, pubkey) {
@@ -463,7 +443,7 @@ async function approve({ account, back, make, needsPublicKey }) {
   paint();
   const go = el("button", {}, ["Approve"]);
   screen(made.summary || "Approve", [
-    el("details", {}, [el("summary", {}, ["Transaction details"]), pre]),
+    el("details", { class: "raw" }, [el("summary", {}, ["Transaction details"]), pre]),
     go,
   ]);
 
@@ -473,13 +453,7 @@ async function approve({ account, back, make, needsPublicKey }) {
     const challenge = made.payment
       ? await paymentChallenge(api, { sequence: prepared.Sequence, destination: made.payment.destination, drops: made.payment.drops })
       : await txChallenge(api, prepared, holder, definitions);
-    await labelPasskey(idBytes, made.summary);
-    let assertion;
-    try {
-      assertion = await getPasskey(challenge, salt, loaded.credentialId);
-    } finally {
-      await labelPasskey(idBytes, account);
-    }
+    const assertion = await getPasskey(challenge, salt, loaded.credentialId);
     if (!seed) seed = await unlockSeed(account, assertion, loaded.vault);
     const wallet = walletFromSeed(seed);
     if (wallet.address !== account) throw new Error("the sealed seed does not match this account");
@@ -980,7 +954,7 @@ function scan(account) {
   video.setAttribute("playsinline", "");
   const reticle = el("div", { class: "reticle" });
   const finder = el("div", { class: "finder" }, [video, reticle]);
-  const note = el("p", { class: "muted" }, ["Point the camera at a sign QR or an account address."]);
+  const note = el("p", { class: "muted" }, ["Hold the code in the frame. Tap the picture if it stays blurry."]);
   const pasted = el("input", { type: "text", placeholder: "Or paste a link or address", autocomplete: "off", spellcheck: "false" });
   const open = el("button", { class: "ghost", type: "button" }, ["Open"]);
   const paste = el("div", { class: "paste" }, [pasted, open]);
@@ -989,17 +963,16 @@ function scan(account) {
     : [finder, note, paste], "scan");
   const gen = viewGen;
   open.addEventListener("click", () => {
-    if (pasted.value.trim()) openScanned(pasted.value.trim());
+    if (pasted.value.trim()) take(pasted.value.trim());
   });
   video.playsInline = true;
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   let stopped = false;
+  let locked = false;
   let frameHandle = 0;
   let step = 0;
-  // Straight reads come first so focus can settle. A strong tilt gets one
-  // turned attempt after those, which still covers a phone held at an angle.
-  const turns = [0, 0, 20, 0, 0, -20];
+  let detecting = false;
   stopCamera = () => {
     stopped = true;
     if (frameHandle && video.cancelVideoFrameCallback) video.cancelVideoFrameCallback(frameHandle);
@@ -1020,80 +993,89 @@ function scan(account) {
     if (x1 - x0 < 21 || y1 - y0 < 21) return null;
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   };
-  // The preview covers the finder, so most of the camera frame is off screen.
-  // Sample the reticle the user is aiming with, in the camera's own pixels.
-  const guideRect = () => {
+  // object-fit: cover hides the rest of the sensor. Map an on-screen box
+  // back into video pixels, then grow it a little for the quiet zone.
+  const mappedRect = (mark, grow) => {
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     if (!vw || !vh) return null;
     const box = video.getBoundingClientRect();
-    const mark = reticle.getBoundingClientRect();
-    if (box.width < 20 || mark.width < 20) {
-      const side = Math.round(Math.min(vw, vh) * 0.72);
+    if (box.width < 20 || box.height < 20 || !mark || mark.width < 20) {
+      const side = Math.min(vw, vh) * 0.72;
       return clamp((vw - side) / 2, (vh - side) / 2, side, side, vw, vh);
     }
     const scale = Math.max(box.width / vw, box.height / vh);
     const offsetX = (box.width - vw * scale) / 2;
     const offsetY = (box.height - vh * scale) / 2;
-    const grow = 0.22;
     let w = mark.width / scale;
     let h = mark.height / scale;
-    let x = (mark.left - box.left - offsetX) / scale - (w * grow) / 2;
-    let y = (mark.top - box.top - offsetY) / scale - (h * grow) / 2;
+    let x = (mark.left - box.left - offsetX) / scale;
+    let y = (mark.top - box.top - offsetY) / scale;
+    x -= (w * grow) / 2;
+    y -= (h * grow) / 2;
     w *= 1 + grow;
     h *= 1 + grow;
     return clamp(x, y, w, h, vw, vh);
   };
+  const centerSquare = (rect, frac) => {
+    const side = Math.min(rect.w, rect.h) * frac;
+    return clamp(rect.x + (rect.w - side) / 2, rect.y + (rect.h - side) / 2, side, side, video.videoWidth, video.videoHeight);
+  };
   const readRect = (rect, turn, maxEdge) => {
-    const long = Math.max(rect.w, rect.h);
-    const scale = Math.min(1, maxEdge / long);
-    canvas.width = Math.max(21, Math.round(rect.w * scale));
-    canvas.height = Math.max(21, Math.round(rect.h * scale));
-    ctx.drawImage(video, rect.x, rect.y, rect.w, rect.h, 0, 0, canvas.width, canvas.height);
-    const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    return { text: decodeImage(frame.data, canvas.width, canvas.height, turn), shrunk: scale < 0.999 };
+    const scale = Math.min(1, maxEdge / Math.max(rect.w, rect.h));
+    const w = Math.max(21, Math.round(rect.w * scale));
+    const h = Math.max(21, Math.round(rect.h * scale));
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    ctx.drawImage(video, rect.x, rect.y, rect.w, rect.h, 0, 0, w, h);
+    const frame = ctx.getImageData(0, 0, w, h);
+    return decodeImage(frame.data, w, h, turn);
+  };
+  const take = (text) => {
+    if (!text || locked || stopped || gen !== viewGen) return;
+    locked = true;
+    stopCamera();
+    openScanned(text);
   };
   const again = () => {
-    if (stopped || gen !== viewGen) return;
+    if (stopped || locked || gen !== viewGen) return;
     if (video.requestVideoFrameCallback) frameHandle = video.requestVideoFrameCallback(tick);
     else frameHandle = requestAnimationFrame(tick);
   };
-  const tick = async () => {
-    if (stopped || gen !== viewGen) return;
+  const tick = () => {
+    if (stopped || locked || gen !== viewGen) return;
     try {
+      if (detector && !detecting && video.readyState >= 2) {
+        detecting = true;
+        detector.detect(video).then((codes) => {
+          detecting = false;
+          take(codes?.[0]?.rawValue || "");
+        }).catch(() => {
+          detecting = false;
+          detector = null;
+        });
+      }
       if (video.readyState >= 2) {
-        let text = "";
-        if (detector) {
-          try {
-            const codes = await detector.detect(video);
-            text = codes[0]?.rawValue || "";
-          } catch {
-            detector = null;
+        // Scaling the whole guide throws away the pixels of a code that does
+        // not fill it. Read the center at the sensor's own size first. The
+        // two sizes cover a code inside the guide and a smaller one; the
+        // guide itself catches a code that fills it. At most two reads.
+        const seen = mappedRect(video.getBoundingClientRect(), 0);
+        const zoom = seen && centerSquare(seen, (step & 1) === 0 ? 0.46 : 0.28);
+        let text = zoom ? readRect(zoom, 0, 440) : "";
+        if (!text && zoom && step % 8 === 7) {
+          text = readRect(zoom, step % 16 === 7 ? 20 : -20, 360);
+        } else if (!text) {
+          const wide = mappedRect(reticle.getBoundingClientRect(), 0.12);
+          const zoomLong = zoom ? Math.max(zoom.w, zoom.h) : 0;
+          const wideLong = wide ? Math.max(wide.w, wide.h) : 0;
+          if (wide && !(zoomLong && Math.abs(zoomLong - wideLong) / Math.max(zoomLong, wideLong) < 0.15)) {
+            text = readRect(wide, 0, 380);
           }
         }
-        if (!text) {
-          const turn = turns[step % turns.length];
-          step += 1;
-          const guide = guideRect();
-          if (guide) {
-            const first = readRect(guide, turn, 640);
-            text = first.text;
-            // A tighter crop only adds detail when the guide was scaled down.
-            if (!text && first.shrunk) {
-              const tight = clamp(
-                guide.x + guide.w * 0.22,
-                guide.y + guide.h * 0.22,
-                guide.w * 0.56,
-                guide.h * 0.56,
-                video.videoWidth,
-                video.videoHeight,
-              );
-              if (tight) text = readRect(tight, turn, 640).text;
-            }
-          }
-        }
-        if (text && gen === viewGen) {
-          openScanned(text);
+        step += 1;
+        if (text) {
+          take(text);
           return;
         }
       }
@@ -1119,6 +1101,25 @@ function scan(account) {
     if (giveUp(error)) throw error;
     return next();
   };
+  let videoTrack = null;
+  // A point of interest makes the phone focus on the guide. Without it, a
+  // continuous focus request is often ignored and the picture stays soft.
+  const refocus = () => {
+    const track = videoTrack;
+    if (!track) return;
+    const sharpen = (point) => {
+      const caps = track.getCapabilities?.() || {};
+      const advanced = {};
+      if (caps.focusMode?.includes("continuous")) advanced.focusMode = "continuous";
+      if (caps.exposureMode?.includes("continuous")) advanced.exposureMode = "continuous";
+      if (caps.whiteBalanceMode?.includes("continuous")) advanced.whiteBalanceMode = "continuous";
+      if (point) advanced.pointsOfInterest = [{ x: 0.5, y: 0.5 }];
+      if (!Object.keys(advanced).length) return Promise.resolve();
+      return track.applyConstraints({ advanced: [advanced] });
+    };
+    sharpen(true).catch(() => sharpen(false)).catch(() => {});
+  };
+  finder.addEventListener("click", refocus);
   getCamera({ audio: false, video: { ...camera, advanced: [{ focusMode: "continuous" }] } })
     .catch(fallback(() => getCamera({ audio: false, video: camera })))
     .catch(fallback(() => getCamera(plain)))
@@ -1127,13 +1128,8 @@ function scan(account) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
-      const track = stream.getVideoTracks?.()[0];
-      const caps = track?.getCapabilities?.() || {};
-      const advanced = {};
-      if (caps.focusMode?.includes("continuous")) advanced.focusMode = "continuous";
-      if (caps.exposureMode?.includes("continuous")) advanced.exposureMode = "continuous";
-      if (caps.whiteBalanceMode?.includes("continuous")) advanced.whiteBalanceMode = "continuous";
-      if (track && Object.keys(advanced).length) track.applyConstraints({ advanced: [advanced] }).catch(() => {});
+      videoTrack = stream.getVideoTracks?.()[0] || null;
+      refocus();
       video.srcObject = stream;
       video.play?.().catch(() => {});
       again();

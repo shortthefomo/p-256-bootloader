@@ -44,10 +44,32 @@ function href(op, extra) {
   return S + (S.indexOf("?") < 0 ? "?" : "&") + query;
 }
 
+const note = document.createElement("p");
+note.className = "note";
+const raw = document.createElement("details");
+raw.className = "raw";
+raw.hidden = true;
+const summary = document.createElement("summary");
+summary.textContent = "Details";
+m.replaceWith(note, raw);
+raw.append(summary, m);
+
+function showNote(text) {
+  note.textContent = text || "";
+  m.textContent = "";
+  raw.hidden = true;
+  raw.open = false;
+}
+
 function showJson(text) {
   let pretty = text;
-  try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (error) { pretty = text; }
+  try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (error) {
+    showNote(text);
+    return;
+  }
   m.textContent = pretty;
+  raw.hidden = false;
+  raw.open = false;
 }
 
 const phone = window.matchMedia("(max-width: 860px)").matches;
@@ -65,7 +87,7 @@ const stage = document.createElement("section");
 stage.className = "stage";
 const intro = $("intro") || document.querySelector("p.m:not(#g)");
 side.append.apply(side, [document.querySelector("h1"), intro, $("a").parentElement, balanceLine, $("g")].filter(Boolean));
-stage.append.apply(stage, [$("d"), $("m")].filter(Boolean));
+stage.append.apply(stage, [$("d"), note, raw].filter(Boolean));
 frame.append(side, stage);
 document.querySelector("main").replaceChildren(frame);
 
@@ -83,15 +105,16 @@ const hash = new URLSearchParams(location.hash.slice(1));
 const txHash = hash.get("tx");
 if (hash.get("err")) showJson(hash.get("err"));
 else if (txHash) {
-  m.textContent = "Sent " + txHash;
+  showNote("Sent " + txHash);
   rpc("tx", { transaction: txHash }).then(function (result) {
-    m.textContent = JSON.stringify(result, null, 2);
+    showJson(JSON.stringify(result));
+    note.textContent = "Sent " + txHash;
   }).catch(function () {});
 }
 
 rpc("account_info", { account: acct, ledger_index: "validated" }).then(function (info) {
   $("b").textContent = xah(info.account_data.Balance);
-}).catch(function (error) { m.textContent = error.message; });
+}).catch(function (error) { showNote(error.message); });
 
 function panel(id) {
   const node = document.createElement("div");
@@ -147,12 +170,12 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
     const dest = destination.value.trim();
     if (!/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(dest)) {
       event.preventDefault();
-      m.textContent = "Enter a destination address";
+      showNote("Enter a destination address");
       return;
     }
     if (!/^\d+(\.\d{0,6})?$/.test(value)) {
       event.preventDefault();
-      m.textContent = "Enter an amount";
+      showNote("Enter an amount");
       return;
     }
     sign.href = href("pay", { dest: dest, xah: value });

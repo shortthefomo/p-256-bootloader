@@ -32,10 +32,12 @@ input {
 .m { color: #93a0b5; font-size: .88rem; }
 code { word-break: break-all; }
 pre.json {
+  box-sizing: border-box;
+  max-width: 100%;
   margin: .8rem 0;
   padding: .8rem;
   overflow: auto;
-  max-height: 50vh;
+  max-height: 40vh;
   border-radius: .7rem;
   background: #151b24;
   border: 1px solid #243041;
@@ -44,17 +46,32 @@ pre.json {
   overflow-wrap: anywhere;
 }
 pre.json:empty { display: none; }
+.note { margin: .6rem 0; color: #ffd38a; }
+.note:empty { display: none; }
+details.raw {
+  margin: .8rem 0;
+  border: 1px solid #243041;
+  border-radius: .8rem;
+  background: #151b24;
+}
+details.raw[hidden] { display: none; }
+details.raw summary { padding: .8rem .9rem; cursor: pointer; font-weight: 700; }
+details.raw pre.json { margin: 0; border: 0; border-radius: 0; border-top: 1px solid #243041; }
 .balance { font-size: 2.4rem; font-weight: 750; letter-spacing: -.03em; margin: .2rem 0 .35rem; }
 .tx { padding: .7rem 0; border-top: 1px solid #243041; }
-html[data-shell="phone"] main { padding-bottom: 5.6rem; }
+html[data-shell="phone"] main { padding-bottom: calc(5.6rem + env(safe-area-inset-bottom)); }
+html[data-shell="phone"] #frame, html[data-shell="phone"] .stage, html[data-shell="phone"] .panel { min-width: 0; max-width: 100%; }
 html[data-shell="phone"] .panel h2 { display: none; }
 html[data-shell="phone"] nav.tabs {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 2;
+  z-index: 5;
   display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
   gap: .25rem;
   margin: 0;
   padding: .4rem .4rem calc(.45rem + env(safe-area-inset-bottom));
@@ -62,18 +79,29 @@ html[data-shell="phone"] nav.tabs {
   border-top: 1px solid #243041;
 }
 html[data-shell="phone"] nav.tabs button, html[data-shell="phone"] nav.tabs a {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0;
   width: auto;
-  flex: 1;
+  min-width: 0;
+  height: 2.75rem;
   margin: 0;
-  padding: .75rem .2rem;
+  padding: 0 .2rem;
   background: transparent;
   color: #93a0b5;
   border: 0;
   border-radius: .7rem;
   text-decoration: none;
+  font: inherit;
   font-size: .8rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
 }
-html[data-shell="phone"] nav.tabs button.on { background: #8dffc1; color: #042; }
+html[data-shell="phone"] nav.tabs button.on, html[data-shell="phone"] nav.tabs a.on { background: #8dffc1; color: #042; }
 html[data-shell="phone"] .panel { display: none; }
 html[data-shell="phone"] .panel.on { display: block; }
 html[data-shell="desk"] main { max-width: 64rem; padding: 1.4rem 1.5rem 2.5rem; }

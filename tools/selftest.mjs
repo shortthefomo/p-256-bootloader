@@ -103,6 +103,10 @@ const walletJs = readFileSync(new URL("../public/wallet.js", import.meta.url), "
 check("wallet script names the namespace", walletJs.includes(NAMESPACE));
 check("wallet leaves the ledger through a link", walletJs.includes("function href(") && !walletJs.includes("location.assign"));
 check("update is offered only for an old page", html.includes('<meta name="rev" content="2">') && walletJs.includes('content !== "2"'));
+check("ledger json starts collapsed", walletJs.includes('createElement("details")') && walletJs.includes("raw.open = false"));
+const signerApp = readFileSync(new URL("../src/signer-app.mjs", import.meta.url), "utf8");
+check("signer json starts collapsed", signerApp.includes('class: "raw"') && signerApp.includes('["Details"]') && signerApp.includes('["Transaction details"]'));
+check("signing does not rename the passkey", !signerApp.includes("signalCurrentUserDetails"));
 
 let firewall = null;
 try {
@@ -220,6 +224,23 @@ check(
   "qr reads a steep tilt on a later frame",
   [20, -20].some((turn) => decodeImage(steep, 640, 640, turn) === signText),
 );
+function cropCenter(src, frame, fraction) {
+  const side = Math.max(21, Math.round(frame * fraction));
+  const x0 = Math.floor((frame - side) / 2);
+  const y0 = Math.floor((frame - side) / 2);
+  const out = new Uint8ClampedArray(side * side * 4);
+  for (let y = 0; y < side; y += 1) {
+    const from = ((y0 + y) * frame + x0) * 4;
+    out.set(src.subarray(from, from + side * 4), y * side * 4);
+  }
+  return out;
+}
+const distant = placeQr(raster.rgba, raster.width, raster.height, 960, 0.22);
+check("qr misses a distant code in the full frame", decodeImage(distant, 960, 960) === "");
+const centered = cropCenter(distant, 960, 0.4);
+const centerSide = Math.round(960 * 0.4);
+check("qr reads that code from the center", decodeImage(centered, centerSide, centerSide) === signText);
+check("qr still reads a clean code after a photo", decodeImage(raster.rgba, raster.width, raster.height) === signText);
 const longText = "https://wallet.example/sign?" + "a".repeat(240);
 const longQr = encodeQr(longText);
 check("long qr roundtrip", decodeQr(longQr.modules, longQr.size) === longText && longQr.version > 8);

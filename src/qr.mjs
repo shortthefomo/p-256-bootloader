@@ -690,36 +690,55 @@ function solve(matrix, values) {
   return m.map((row) => row[n]);
 }
 
+// Reused across frames. The camera decodes one crop, then the next, and the
+// finder scan finishes before the next call. A fresh integral would be a
+// large allocation on every frame.
+let grayBuf = new Uint8Array(0);
+let binBuf = new Uint8Array(0);
+let sumBuf = new Uint32Array(0);
+
 function binarize(rgba, width, height) {
-  const gray = new Uint8Array(width * height);
-  for (let i = 0; i < gray.length; i += 1) {
+  const count = width * height;
+  const stride = width + 1;
+  if (grayBuf.length < count) grayBuf = new Uint8Array(count);
+  if (binBuf.length < count) binBuf = new Uint8Array(count);
+  if (sumBuf.length < stride * (height + 1)) sumBuf = new Uint32Array(stride * (height + 1));
+  const gray = grayBuf;
+  const bin = binBuf;
+  const integral = sumBuf;
+  for (let i = 0; i < count; i += 1) {
     gray[i] = (rgba[i * 4] * 54 + rgba[i * 4 + 1] * 183 + rgba[i * 4 + 2] * 19) >> 8;
   }
-  const integral = new Uint32Array((width + 1) * (height + 1));
+  // The top row and the left column are the zero border. A later crop can
+  // have a different stride, so a reused buffer must clear them again.
+  for (let i = 0; i < stride; i += 1) integral[i] = 0;
+  for (let y = 0; y <= height; y += 1) integral[y * stride] = 0;
   for (let y = 0; y < height; y += 1) {
     let row = 0;
+    const grayRow = y * width;
+    const below = y * stride;
+    const dest = below + stride;
     for (let x = 0; x < width; x += 1) {
-      row += gray[y * width + x];
-      integral[(y + 1) * (width + 1) + (x + 1)] = integral[y * (width + 1) + (x + 1)] + row;
+      row += gray[grayRow + x];
+      integral[dest + x + 1] = integral[below + x + 1] + row;
     }
   }
   // A small window keeps a blurred screen code from being averaged into the
   // background. The cap stops the window growing with the photo.
   const win = Math.max(8, Math.min(32, (Math.min(width, height) / 16) | 0));
   const radius = win >> 1;
-  const bin = new Uint8Array(width * height);
   for (let y = 0; y < height; y += 1) {
     const y0 = Math.max(0, y - radius);
     const y1 = Math.min(height - 1, y + radius);
+    const y0s = y0 * stride;
+    const y1s = (y1 + 1) * stride;
+    const grow = y * width;
     for (let x = 0; x < width; x += 1) {
       const x0 = Math.max(0, x - radius);
       const x1 = Math.min(width - 1, x + radius);
       const area = (y1 - y0 + 1) * (x1 - x0 + 1);
-      const sum = integral[(y1 + 1) * (width + 1) + (x1 + 1)]
-        - integral[y0 * (width + 1) + (x1 + 1)]
-        - integral[(y1 + 1) * (width + 1) + x0]
-        + integral[y0 * (width + 1) + x0];
-      bin[y * width + x] = gray[y * width + x] * area * 4 < sum * 3 ? 1 : 0;
+      const sum = integral[y1s + x1 + 1] - integral[y0s + x1 + 1] - integral[y1s + x0] + integral[y0s + x0];
+      bin[grow + x] = gray[grow + x] * area * 4 < sum * 3 ? 1 : 0;
     }
   }
   return bin;
