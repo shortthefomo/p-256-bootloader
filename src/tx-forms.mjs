@@ -195,6 +195,7 @@ export const TX_KINDS = [
 export function transactionFromKind(kind, values, nowSec = Math.floor(Date.now() / 1000)) {
   const input = values || {};
   if (kind === "Payment") {
+    // The payment challenge counts drops. An issued currency on this path rolls back.
     const destination = address(input.destination, "destination");
     const drops = xah(input.xah, "amount");
     return {
@@ -220,7 +221,8 @@ export function transactionFromKind(kind, values, nowSec = Math.floor(Date.now()
     return {
       summary: "Create an offer",
       payment: null,
-      tx: { TransactionType: "OfferCreate", TakerPays: pays, TakerGets: gets },
+      // TakerGets leaves this account. TakerPays is what it receives.
+      tx: { TransactionType: "OfferCreate", TakerPays: gets, TakerGets: pays },
     };
   }
   if (kind === "OfferCancel") {

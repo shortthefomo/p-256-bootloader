@@ -1,6 +1,7 @@
 import { loaderChanged, renderBootloader } from "./bootloader.mjs";
 import { decodeImage, encodeQr } from "./qr.mjs";
 import {
+  currencyLabel,
   describeTx,
   isAddress,
   parseScan,
@@ -31,6 +32,7 @@ import {
   NAMESPACE,
   accountBytes,
   accountSetLoaderTx,
+  explorerLinks,
   invokeTx,
   loaderHtmlFromEntry,
   networkDefinitions,
@@ -39,6 +41,7 @@ import {
   pwaUrl,
   rpcSocket,
   safeReturn,
+  txUrl,
   firewallBlock,
   setHookTx,
   stateValue,
@@ -264,7 +267,10 @@ async function runSteps(lines, steps) {
     list.append(item);
     try {
       const detail = await step.run();
-      item.textContent = detail ? `${step.label}. ${detail}` : `${step.label}.`;
+      const link = detail ? txUrl(detail) : "";
+      item.replaceChildren(document.createTextNode(detail ? `${step.label}. ` : `${step.label}.`));
+      if (link) item.append(el("a", { href: link }, [shortAddress(detail)]));
+      else if (detail) item.append(document.createTextNode(detail));
       if (detail) lines.push(detail);
     } catch (error) {
       item.textContent = `${step.label} failed. ${error.message}`;
@@ -401,9 +407,11 @@ async function loadAccount(account) {
 
 function sent(account, back, hash, result) {
   const next = back || pwaUrl(account);
+  const url = txUrl(hash);
+  const where = url ? el("a", { href: url }, [shortAddress(hash)]) : shortAddress(hash);
   const backBtn = el("button", { onclick: () => location.assign(`${next}#tx=${hash}`) }, ["Back to wallet"]);
   screen("Result", [
-    el("p", {}, ["Sent."]),
+    el("p", {}, ["Sent ", where, "."]),
     el("details", { class: "raw" }, [
       el("summary", {}, ["Details"]),
       el("pre", { class: "json" }, [JSON.stringify(result, null, 2)]),
@@ -638,12 +646,43 @@ function addressRow(account) {
   ]);
 }
 
+function txRow(row) {
+  const links = explorerLinks(row.hash);
+  const status = el("span", { class: row.ok ? "muted" : "warn" }, [row.ok ? shortAddress(row.hash) : "Failed"]);
+  if (links.length <= 1) {
+    const body = [el("b", {}, [row.line]), status];
+    return links.length ? el("a", { class: "tx", href: links[0].url }, body) : el("div", { class: "tx" }, body);
+  }
+  return el("div", { class: "tx" }, [
+    el("a", { href: links[0].url }, [el("b", {}, [row.line])]),
+    status,
+    ...links.slice(1).map((link) => el("a", { href: link.url }, [link.name])),
+  ]);
+}
+
 function txList(rows) {
   if (!rows.length) return el("p", { class: "muted" }, ["No transactions yet."]);
-  return el("div", {}, rows.map((row) => el("div", { class: "tx" }, [
-    el("b", {}, [row.line]),
-    el("span", { class: row.ok ? "muted" : "warn" }, [row.ok ? shortAddress(row.hash) : "Failed"]),
-  ])));
+  return el("div", {}, rows.map(txRow));
+}
+
+function holdsBalance(line) {
+  const balance = String(line?.balance ?? "");
+  return balance !== "" && !/^0(?:\.0+)?$/.test(balance);
+}
+
+function issuedNodes(lines) {
+  return (lines || []).filter(holdsBalance).map((line) => el("li", {}, [
+    `${line.balance} ${currencyLabel(line.currency)} · ${shortAddress(line.account)}`,
+  ]));
+}
+
+async function issuedLines(account) {
+  try {
+    const page = await rpc("account_lines", { account, ledger_index: "validated" });
+    return page.lines || [];
+  } catch {
+    return null;
+  }
 }
 
 async function recent(account, limit) {
@@ -666,9 +705,10 @@ function followLedgers(account, gen, paint) {
     Promise.all([
       rpc("account_info", { account, ledger_index: "validated" }),
       recent(account, 6).catch(() => null),
-    ]).then(([info, rows]) => {
+      issuedLines(account),
+    ]).then(([info, rows, lines]) => {
       if (gen !== viewGen) return;
-      paint(dropsToXah(info.account_data.Balance), rows);
+      paint(dropsToXah(info.account_data.Balance), rows, lines);
     }).catch(() => {}).finally(() => {
       busy = false;
       if (again && gen === viewGen) {
@@ -710,31 +750,38 @@ async function walletHome(account) {
   screen("Wallet", [el("p", { class: "muted" }, ["Loading the account…"])], "home");
   const gen = viewGen;
   try {
-    const info = await rpc("account_info", { account, ledger_index: "validated" });
-    if (gen !== viewGen) return;
-    let rows = [];
-    try {
-      rows = await recent(account, 6);
-    } catch {
-      rows = [];
-    }
+    const [info, rows, lines] = await Promise.all([
+      rpc("account_info", { account, ledger_index: "validated" }),
+      recent(account, 6).catch(() => []),
+      issuedLines(account),
+    ]);
     if (gen !== viewGen) return;
     const stale = await pageIsStale(account);
     if (gen !== viewGen) return;
     const amount = document.createTextNode(dropsToXah(info.account_data.Balance));
+    const linesBox = el("ul", { class: "lines" });
     const feed = el("div", { class: "feed" });
     let shownRows = null;
-    const paint = (balance, nextRows) => {
+    let shownLines = null;
+    const paint = (balance, nextRows, nextLines) => {
       if (amount.data !== balance) amount.data = balance;
+      if (nextLines != null) {
+        const lineSig = nextLines.map((line) => `${line.currency}:${line.account}:${line.balance}`).join(" ");
+        if (lineSig !== shownLines) {
+          shownLines = lineSig;
+          linesBox.replaceChildren(...issuedNodes(nextLines));
+        }
+      }
       if (!nextRows) return;
       const signature = nextRows.map((row) => `${row.hash}:${row.ok}`).join(" ");
       if (signature === shownRows) return;
       shownRows = signature;
       feed.replaceChildren(txList(nextRows));
     };
-    paint(amount.data, rows);
+    paint(amount.data, rows, lines);
     const hero = [
       el("p", { class: "balance" }, [amount, el("span", {}, [" XAH"])]),
+      linesBox,
       addressRow(account),
       stale ? updateBanner(account) : null,
     ];

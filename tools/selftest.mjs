@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertLoaderHtml, loaderChanged, renderBootloader } from "../src/bootloader.mjs";
@@ -22,8 +23,8 @@ import {
   xahToDrops,
 } from "../src/protocol.mjs";
 import { decodeImage, decodeQr, encodeQr, rasterQr } from "../src/qr.mjs";
-import { kindFromTx, parseScan, payLink, requestLink, samePayment } from "../src/scan.mjs";
-import { HOOK_ON, NAMESPACE, accountBytes, safeReturn, stateValue } from "../src/wallet.mjs";
+import { describeTx, kindFromTx, parseScan, payLink, requestLink, samePayment, shortAddress } from "../src/scan.mjs";
+import { EXPLORER, HOOK_ON, NAMESPACE, accountBytes, explorerUrls, safeReturn, stateValue, txUrl } from "../src/wallet.mjs";
 import { generate, libraries } from "xrpl-accountlib";
 
 let failed = 0;
@@ -108,6 +109,16 @@ const signerApp = readFileSync(new URL("../src/signer-app.mjs", import.meta.url)
 check("signer json starts collapsed", signerApp.includes('class: "raw"') && signerApp.includes('["Details"]') && signerApp.includes('["Transaction details"]'));
 check("signing does not rename the passkey", !signerApp.includes("signalCurrentUserDetails"));
 check("home follows closed ledgers", signerApp.includes('streams: ["ledger"]') && walletJs.includes('streams: ["ledger"]') && walletJs.includes('body.type === "ledgerClosed"'));
+check("home shows issued balances", signerApp.includes("account_lines") && walletJs.includes("account_lines"));
+const txHash = "ab".repeat(32);
+check("devnet tx link", txUrl(txHash.toUpperCase()) === `${EXPLORER}/tx/${txHash}` && txUrl(txHash, 21337) === "");
+check("a network can list several explorers", explorerUrls(txHash, [
+  { name: "One", origin: "https://one.example", txPath: "/tx/" },
+  { name: "Two", origin: "https://two.example", txPath: "/transactions/" },
+]).map((item) => item.url).join(" ") === `https://one.example/tx/${txHash} https://two.example/transactions/${txHash}`);
+check("tx link needs 64 hex", txUrl("abcd") === "");
+check("ledger uses the same explorer", walletJs.includes(`origin: "${EXPLORER}"`) && walletJs.includes('txPath: "/tx/"') && walletJs.includes("function txUrl(") && walletJs.includes("links[0].url"));
+check("activity rows link out", signerApp.includes("explorerLinks(") && signerApp.includes("txUrl("));
 
 let firewall = null;
 try {
@@ -140,6 +151,15 @@ const payment = transactionFromKind("Payment", { destination: account, xah: "2" 
 check("payment form is native drops", payment.tx.Amount === "2000000" && payment.payment.drops === 2000000n);
 const trust = transactionFromKind("TrustSet", { issuer: account, currency: "usd", limit: "100" });
 check("trust line sets no ripple", trust.tx.LimitAmount.currency === "USD" && trust.tx.Flags === 131072);
+const offer = transactionFromKind("OfferCreate", {
+  pays: "2",
+  paysCurrency: "XAH",
+  paysIssuer: "",
+  gets: "5",
+  getsCurrency: "USD",
+  getsIssuer: account,
+});
+check("offer gives what you pay", offer.tx.TakerGets === "2000000" && offer.tx.TakerPays.currency === "USD" && offer.tx.TakerPays.value === "5");
 const escrow = transactionFromKind("EscrowCreate", { destination: account, xah: "1", seconds: "60" }, 1_700_000_000);
 check("escrow finish is ripple time", escrow.tx.FinishAfter === 1_700_000_000 + 60 - 946684800);
 let badKind = false;
@@ -271,6 +291,56 @@ check("payment watch matches drops", samePayment(
   { ok: true, hash: "abc", type: "Payment", destination: account, amount: "1500000" },
   { dest: account, drops: 1500000n },
 ));
+const nativeTx = describeTx({
+  hash: txHash,
+  tx: { TransactionType: "Payment", Account: account, Destination: account, Amount: "1500000" },
+  meta: { TransactionResult: "tesSUCCESS", delivered_amount: "1500000" },
+});
+check("activity names a native payment", nativeTx.line === `Payment · 1.5 XAH to ${shortAddress(account)}` && nativeTx.amount === "1500000" && samePayment(nativeTx, { dest: account, drops: 1500000n }));
+const iouTx = describeTx({
+  hash: txHash,
+  tx_json: {
+    TransactionType: "Payment",
+    Destination: account,
+    Amount: { currency: "USD", issuer: account, value: "12.5" },
+  },
+  meta: { TransactionResult: "tesSUCCESS" },
+});
+check("activity names an iou payment", iouTx.type === "Payment" && iouTx.line.includes("12.5 USD") && iouTx.line.startsWith("Payment") && iouTx.amount === "");
+const trustTx = describeTx({
+  tx: { TransactionType: "TrustSet", LimitAmount: { currency: "EUR", issuer: account, value: "100" } },
+});
+check("activity names a trust line", trustTx.line.startsWith("TrustSet") && trustTx.line.includes("100 EUR"));
+const offerTx = describeTx({
+  tx: {
+    TransactionType: "OfferCreate",
+    TakerGets: "1000000",
+    TakerPays: { currency: "USD", issuer: account, value: "2" },
+  },
+});
+check("activity names an offer", offerTx.line.startsWith("OfferCreate") && offerTx.line.includes("1 XAH for 2 USD"));
+const helperStart = walletJs.indexOf("function xah(");
+const helperEnd = walletJs.indexOf("\nfunction rpc(");
+const ledgerFns = {};
+runInNewContext(`${walletJs.slice(helperStart, helperEnd)}\nthis.txLine = txLine; this.pageTxUrl = txUrl;`, ledgerFns);
+check("ledger activity matches the signer", ledgerFns.txLine({
+  hash: txHash,
+  tx: { TransactionType: "Payment", Account: account, Destination: account, Amount: "1500000" },
+  meta: { TransactionResult: "tesSUCCESS", delivered_amount: "1500000" },
+}) === nativeTx.line && ledgerFns.txLine({
+  tx_json: {
+    TransactionType: "Payment",
+    Destination: account,
+    Amount: { currency: "USD", issuer: account, value: "12.5" },
+  },
+  meta: { TransactionResult: "tesSUCCESS" },
+}) === iouTx.line && ledgerFns.txLine({
+  tx: {
+    TransactionType: "OfferCreate",
+    TakerGets: "1000000",
+    TakerPays: { currency: "USD", issuer: account, value: "2" },
+  },
+}) === offerTx.line && ledgerFns.pageTxUrl(txHash) === txUrl(txHash));
 
 if (failed) {
   console.log(`${failed} failed`);

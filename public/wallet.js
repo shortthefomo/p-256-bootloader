@@ -13,6 +13,78 @@ function xah(drops) {
   return frac ? whole + "." + frac : "" + whole;
 }
 
+// Keep this list in step with EXPLORERS in src/wallet.mjs. The first entry is the link.
+const NETWORK = 21339;
+const EXPLORERS = {
+  21339: [{ name: "Passkey devnet", origin: "https://explorer.passkey.xahau-dev.net", txPath: "/tx/" }],
+};
+
+function txUrl(hash) {
+  const text = String(hash || "").trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(text)) return "";
+  const list = EXPLORERS[NETWORK] || [];
+  if (!list.length) return "";
+  return list[0].origin + list[0].txPath + text;
+}
+
+function explorerLinks(hash) {
+  const text = String(hash || "").trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(text)) return [];
+  const list = EXPLORERS[NETWORK] || [];
+  const out = [];
+  for (let i = 0; i < list.length; i++) out.push({ name: list[i].name, url: list[i].origin + list[i].txPath + text });
+  return out;
+}
+
+function shortAddr(address) {
+  const text = String(address || "");
+  if (text.length < 12) return text;
+  return text.slice(0, 6) + "…" + text.slice(-4);
+}
+
+function currencyLabel(code) {
+  const text = String(code || "");
+  if (text.length <= 8) return text;
+  return text.slice(0, 4) + "…" + text.slice(-4);
+}
+
+function amountText(value) {
+  if (typeof value === "string") {
+    if (!/^\d+$/.test(value)) return "";
+    return xah(value) + " XAH";
+  }
+  if (!value || typeof value !== "object" || value.value == null || value.currency == null) return "";
+  let text = value.value + " " + currencyLabel(value.currency);
+  if (value.issuer) text += " · " + shortAddr(value.issuer);
+  return text;
+}
+
+function txLine(entry) {
+  const tx = entry.tx_json || entry.tx || {};
+  const meta = entry.meta || entry.metaData || {};
+  const type = tx.TransactionType || "Transaction";
+  let shown = "";
+  if (type === "OfferCreate") {
+    const gives = amountText(tx.TakerGets);
+    const wants = amountText(tx.TakerPays);
+    shown = gives && wants ? gives + " for " + wants : (gives || wants);
+  } else {
+    let delivered = type === "Payment" ? meta.delivered_amount : null;
+    if (type === "Payment" && delivered == null) delivered = meta.DeliveredAmount;
+    if (delivered && delivered !== "unavailable") shown = amountText(delivered);
+    if (!shown) shown = amountText(tx.Amount) || amountText(tx.LimitAmount) || amountText(tx.SendMax);
+  }
+  let line = type;
+  if (shown) line += " · " + shown;
+  if (tx.Destination) line += " to " + shortAddr(tx.Destination);
+  return line;
+}
+
+function holdsBalance(line) {
+  const balance = String(line && line.balance != null ? line.balance : "");
+  return balance !== "" && !/^0(?:\.0+)?$/.test(balance);
+}
+
 function rpc(command, params) {
   return new Promise(function (ok, no) {
     const ws = new WebSocket("wss://passkey.xahau-dev.net");
@@ -61,6 +133,19 @@ function showNote(text) {
   raw.open = false;
 }
 
+function sentNote(hash) {
+  note.textContent = "Sent ";
+  const url = txUrl(hash);
+  if (!url) {
+    note.append(document.createTextNode(hash));
+    return;
+  }
+  const link = document.createElement("a");
+  link.href = url;
+  link.textContent = shortAddr(hash);
+  note.append(link);
+}
+
 function showJson(text) {
   let pretty = text;
   try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (error) {
@@ -78,6 +163,8 @@ document.documentElement.dataset.shell = phone ? "phone" : "desk";
 const balanceLine = $("b").parentElement;
 balanceLine.className = "balance";
 balanceLine.replaceChildren($("b"), document.createTextNode(" XAH"));
+const linesBox = document.createElement("div");
+linesBox.className = "lines";
 
 const frame = document.createElement("div");
 frame.id = "frame";
@@ -86,7 +173,7 @@ side.className = "side";
 const stage = document.createElement("section");
 stage.className = "stage";
 const intro = $("intro") || document.querySelector("p.m:not(#g)");
-side.append.apply(side, [document.querySelector("h1"), intro, $("a").parentElement, balanceLine, $("g")].filter(Boolean));
+side.append.apply(side, [document.querySelector("h1"), intro, $("a").parentElement, balanceLine, linesBox, $("g")].filter(Boolean));
 stage.append.apply(stage, [$("d"), note, raw].filter(Boolean));
 frame.append(side, stage);
 document.querySelector("main").replaceChildren(frame);
@@ -105,31 +192,62 @@ const hash = new URLSearchParams(location.hash.slice(1));
 const txHash = hash.get("tx");
 if (hash.get("err")) showJson(hash.get("err"));
 else if (txHash) {
-  showNote("Sent " + txHash);
+  sentNote(txHash);
   rpc("tx", { transaction: txHash }).then(function (result) {
     showJson(JSON.stringify(result));
-    note.textContent = "Sent " + txHash;
+    sentNote(txHash);
   }).catch(function () {});
 }
 
 let activityPanel = null;
 let activityNote = null;
 
+function paintLines(lines) {
+  linesBox.replaceChildren();
+  const list = lines || [];
+  for (let i = 0; i < list.length; i++) {
+    const line = list[i];
+    if (!holdsBalance(line)) continue;
+    const row = document.createElement("p");
+    row.className = "m";
+    row.textContent = line.balance + " " + currencyLabel(line.currency) + " · " + shortAddr(line.account);
+    linesBox.append(row);
+  }
+}
+
 function paintActivity(rows) {
   if (!activityPanel || !activityNote) return;
   const old = activityPanel.querySelectorAll(".tx");
   for (let i = 0; i < old.length; i++) old[i].remove();
-  activityNote.textContent = rows.length ? "" : "No transactions yet.";
-  rows.forEach(function (entry) {
+  const list = rows || [];
+  activityNote.textContent = list.length ? "" : "No transactions yet.";
+  for (let i = 0; i < list.length; i++) {
+    const entry = list[i];
     const tx = entry.tx_json || entry.tx || {};
-    const line = document.createElement("div");
-    line.className = "tx";
-    let text = tx.TransactionType || "Transaction";
-    if (text === "Payment" && typeof tx.Amount === "string") text = xah(tx.Amount) + " XAH";
-    if (tx.Destination) text += " → " + tx.Destination.slice(0, 6) + "…" + tx.Destination.slice(-4);
-    line.textContent = text;
-    activityPanel.append(line);
-  });
+    const links = explorerLinks(entry.hash || tx.hash || "");
+    if (links.length <= 1) {
+      const line = document.createElement(links.length ? "a" : "div");
+      line.className = "tx";
+      if (links.length) line.href = links[0].url;
+      line.textContent = txLine(entry);
+      activityPanel.append(line);
+      continue;
+    }
+    const row = document.createElement("div");
+    row.className = "tx";
+    const primary = document.createElement("a");
+    primary.href = links[0].url;
+    primary.textContent = txLine(entry);
+    row.append(primary);
+    for (let k = 1; k < links.length; k++) {
+      const alt = document.createElement("a");
+      alt.href = links[k].url;
+      alt.textContent = links[k].name;
+      row.append(document.createTextNode(" "));
+      row.append(alt);
+    }
+    activityPanel.append(row);
+  }
 }
 
 let refreshing = false;
@@ -141,12 +259,16 @@ function refreshHome() {
     return;
   }
   refreshing = true;
-  rpc("account_info", { account: acct, ledger_index: "validated" }).then(function (info) {
+  const infoP = rpc("account_info", { account: acct, ledger_index: "validated" }).then(function (info) {
     $("b").textContent = xah(info.account_data.Balance);
-    return rpc("account_tx", { account: acct, limit: 8 });
-  }).then(function (page) {
-    if (page) paintActivity(page.transactions || []);
-  }).catch(function () {}).then(function () {
+  });
+  const txP = rpc("account_tx", { account: acct, limit: 8 }).then(function (page) {
+    paintActivity(page.transactions || []);
+  });
+  const lineP = rpc("account_lines", { account: acct, ledger_index: "validated" }).then(function (page) {
+    paintLines(page.lines || []);
+  });
+  Promise.all([infoP, txP, lineP].map(function (job) { return job.catch(function () {}); })).then(function () {
     refreshing = false;
     if (refreshAgain) {
       refreshAgain = false;
@@ -158,6 +280,10 @@ function refreshHome() {
 rpc("account_info", { account: acct, ledger_index: "validated" }).then(function (info) {
   $("b").textContent = xah(info.account_data.Balance);
 }).catch(function (error) { showNote(error.message); });
+
+rpc("account_lines", { account: acct, ledger_index: "validated" }).then(function (page) {
+  paintLines(page.lines || []);
+}).catch(function () {});
 
 // Each closed ledger can change the validated balance and the history.
 function watchLedgers() {

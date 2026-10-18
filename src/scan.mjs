@@ -16,6 +16,23 @@ export function shortAddress(address) {
   return `${text.slice(0, 6)}…${text.slice(-4)}`;
 }
 
+export function currencyLabel(code) {
+  const text = String(code || "");
+  if (text.length <= 8) return text;
+  return `${text.slice(0, 4)}…${text.slice(-4)}`;
+}
+
+function formatAmount(value) {
+  if (typeof value === "string") {
+    if (!/^\d+$/.test(value)) return "";
+    return `${dropsToXah(value)} XAH`;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  if (value.value == null || value.currency == null) return "";
+  const body = `${value.value} ${currencyLabel(value.currency)}`;
+  return value.issuer ? `${body} · ${shortAddress(value.issuer)}` : body;
+}
+
 function encodePayload(payload) {
   const json = JSON.stringify(payload);
   if (json.length > 1400) throw new Error("this transaction is too large for a QR code");
@@ -174,13 +191,19 @@ export function describeTx(entry) {
   const ok = result === "" || result === "tesSUCCESS";
   const destination = tx.Destination || "";
   const amount = typeof tx.Amount === "string" ? tx.Amount : "";
-  let line = type;
-  if (type === "Payment" && amount) {
-    line = `${dropsToXah(amount)} XAH`;
-    if (destination) line += ` to ${shortAddress(destination)}`;
-  } else if (destination) {
-    line = `${type} · ${shortAddress(destination)}`;
+  let shown = "";
+  if (type === "OfferCreate") {
+    const gives = formatAmount(tx.TakerGets);
+    const wants = formatAmount(tx.TakerPays);
+    shown = gives && wants ? `${gives} for ${wants}` : (gives || wants);
+  } else {
+    const delivered = type === "Payment" ? (meta.delivered_amount ?? meta.DeliveredAmount) : null;
+    const moved = delivered && delivered !== "unavailable" ? formatAmount(delivered) : "";
+    shown = moved || formatAmount(tx.Amount) || formatAmount(tx.LimitAmount) || formatAmount(tx.SendMax);
   }
+  let line = type;
+  if (shown) line += ` · ${shown}`;
+  if (destination) line += ` to ${shortAddress(destination)}`;
   return { type, hash, ledger, ok, destination, amount, line, account: tx.Account || "" };
 }
 

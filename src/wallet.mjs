@@ -18,7 +18,31 @@ export const RPC_HTTP = "https://rpc.passkey.xahau-dev.net";
 export const RPC_WSS = "wss://passkey.xahau-dev.net";
 export const FAUCET = "https://faucet.passkey.xahau-dev.net/accounts";
 export const PWA_HOST = "https://pwa.passkey.xahau-dev.net";
-export const EXPLORER = "https://explorer.passkey.xahau-dev.net";
+// One list per network id. The first entry is the link on a transaction.
+// Mainnet can hold several explorers once each transaction path is known.
+export const EXPLORERS = {
+  21339: [
+    { name: "Passkey devnet", origin: "https://explorer.passkey.xahau-dev.net", txPath: "/tx/" },
+  ],
+};
+export const EXPLORER = EXPLORERS[NETWORK_ID][0].origin;
+
+export function explorerUrls(hash, explorers) {
+  const text = String(hash || "").trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(text) || !Array.isArray(explorers)) return [];
+  return explorers.map((item) => ({
+    name: item.name,
+    url: `${item.origin}${item.txPath}${text}`,
+  }));
+}
+
+export function explorerLinks(hash, networkId = NETWORK_ID) {
+  return explorerUrls(hash, EXPLORERS[networkId] || []);
+}
+
+export function txUrl(hash, networkId = NETWORK_ID) {
+  return explorerLinks(hash, networkId)[0]?.url || "";
+}
 export const HOOK_FEE = "2000000";
 // "p256boot" then zeros, last byte 0x01. 32 bytes. Not a hook name: the hook
 // stays unnamed so a transaction cannot skip it by omitting HookName.
