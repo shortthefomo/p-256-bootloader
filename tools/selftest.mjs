@@ -24,9 +24,9 @@ import {
   xahToDrops,
 } from "../src/protocol.mjs";
 import { decodeImage, decodeQr, encodeQr, rasterQr } from "../src/qr.mjs";
-import { describeTx, kindFromTx, parseScan, payLink, requestLink, samePayment, shortAddress } from "../src/scan.mjs";
+import { describeTx, kindFromTx, parseScan, payLink, requestLink, samePayment, sameTransaction, shortAddress } from "../src/scan.mjs";
 import { AMOUNT_FORMATS, LANGUAGES, canonicalAmount, formatDrops, translate } from "../src/locale.mjs";
-import { EXPLORER, HOOK_HASH, HOOK_ON, INTERFACE_REV, NAMESPACE, accountBytes, explorerUrls, hookLevel, levelTx, safeReturn, stateValue, txUrl } from "../src/wallet.mjs";
+import { EXPLORER, HOOK_HASH, HOOK_ON, INTERFACE_REV, NAMESPACE, accountBytes, explorerUrls, feeCeiling, hookLevel, levelTx, safeReturn, stateValue, txUrl } from "../src/wallet.mjs";
 import { createHash } from "node:crypto";
 import { generate, libraries } from "xrpl-accountlib";
 
@@ -125,6 +125,11 @@ check("signing does not rename the passkey", !signerApp.includes("signalCurrentU
 const walletSrc = readFileSync(new URL("../src/wallet.mjs", import.meta.url), "utf8");
 const liveSrc = readFileSync(new URL("./live.mjs", import.meta.url), "utf8");
 check("wallet asks the network for the fee", walletSrc.includes("async function requiredFee") && walletSrc.includes("function levelTx") && !walletSrc.includes("clearHookTx") && !walletSrc.includes("HOOK_FEE") && !walletSrc.includes("2000000"));
+let badHookCode = false;
+try { feeCeiling({ Hooks: [{ Hook: { CreateCode: "abc" } }] }); } catch { badHookCode = true; }
+const asserted = signerApp.indexOf("await assertAssertion(assertion, challenge)");
+check("a quoted fee cannot exceed what the transaction can cost", feeCeiling({ TransactionType: "Payment" }) === 2n * 1000000n && feeCeiling({ Hooks: [{ Hook: { CreateCode: "" } }] }) === 2n * 1000000n && feeCeiling({ Hooks: [{ Hook: { CreateCode: "ab".repeat(10) } }] }) === 10n * 500n * 2n + 2n * 1000000n && badHookCode && walletSrc.includes("the network fee is higher than this transaction can cost"));
+check("signer checks the passkey before the seed signs", signerApp.includes("async function assertAssertion") && asserted > 0 && signerApp.indexOf("unlockSeed(account, assertion", asserted) > asserted && !signerApp.includes("sessionStorage.setItem(SEED_KEY") && !signerApp.includes("watch.any") && signerApp.includes('text("networkFee")') && translate("en", "networkFee") === "Network fee" && translate("es", "networkFee") === "Comisión de red" && translate("fr", "networkFee") === "Frais du réseau" && translate("de", "networkFee") === "Netzwerkgebühr" && translate("pt", "networkFee") === "Taxa da rede" && translate("zh", "networkFee") === "网络手续费" && translate("ja", "networkFee") === "ネットワーク手数料" && translate("ko", "networkFee") === "네트워크 수수료");
 check("signer does not hardcode the hook fee", !signerApp.includes("HOOK_FEE") && signerApp.includes("requiredFee"));
 check("live test does not hardcode the hook fee", !liveSrc.includes("HOOK_FEE"));
 check("home follows closed ledgers", signerApp.includes('streams: ["ledger"]') && walletJs.includes('streams: ["ledger"]') && walletJs.includes('body.type === "ledgerClosed"'));
@@ -326,6 +331,9 @@ check("payment watch matches drops", samePayment(
   { ok: true, hash: "abc", type: "Payment", destination: account, amount: "1500000" },
   { dest: account, drops: 1500000n },
 ));
+const sentRow = { ok: true, hash: "abc", type: "TrustSet", destination: account, account, amount: "" };
+const otherSpend = { ok: true, hash: "def", type: "Payment", destination: account, account, amount: "1" };
+check("desktop handoff confirms only the shown transaction", sameTransaction(sentRow, account, { type: "TrustSet", destination: account }) && !sameTransaction(otherSpend, account, { type: "TrustSet", destination: account }) && !sameTransaction(sentRow, account, { type: "TrustSet", destination: "rOther" }) && sameTransaction({ ok: true, hash: "abc", type: "AccountSet", destination: "", account }, account, { type: "AccountSet", destination: "" }) && !sameTransaction(otherSpend, "rOther", { dest: account, drops: 1n }));
 const nativeTx = describeTx({
   hash: txHash,
   tx: { TransactionType: "Payment", Account: account, Destination: account, Amount: "1500000" },

@@ -303,6 +303,26 @@ function passkeyFeeMemo() {
   };
 }
 
+// A fee server can name any open_ledger_fee. Ordinary transactions stay under
+// two XAH. Installing hook code pays 500 drops a byte, and twice that load
+// still fits. Anything above this is refused before the seed signs.
+const ORDINARY_FEE_CAP = 2n * 1000000n;
+
+export function feeCeiling(tx) {
+  const hooks = Array.isArray(tx?.Hooks) ? tx.Hooks : [];
+  let bytes = 0n;
+  for (const entry of hooks) {
+    const code = entry?.Hook?.CreateCode;
+    if (code == null || code === "") continue;
+    if (typeof code !== "string" || code.length % 2 !== 0 || !/^[0-9A-Fa-f]+$/.test(code)) {
+      throw new Error("hook code is not hex");
+    }
+    bytes += BigInt(code.length / 2);
+  }
+  if (bytes === 0n) return ORDINARY_FEE_CAP;
+  return bytes * 500n * 2n + ORDINARY_FEE_CAP;
+}
+
 export async function requiredFee(api, rpc, tx, definitions) {
   const probe = { ...tx, Fee: "0", SigningPubKey: "" };
   delete probe.TxnSignature;
@@ -310,6 +330,7 @@ export async function requiredFee(api, rpc, tx, definitions) {
   if (!probe.Memos) probe.Memos = [passkeyFeeMemo()];
   if (probe.Sequence == null) probe.Sequence = 1;
   if (probe.NetworkID == null) probe.NetworkID = NETWORK_ID;
+  const cap = feeCeiling(probe);
   const blob = api.sign(probe, api.derive.passphrase(""), definitions).signedTransaction;
   const quoted = await rpc("fee", { tx_blob: blob });
   const drops = quoted.drops || {};
@@ -318,6 +339,7 @@ export async function requiredFee(api, rpc, tx, definitions) {
   const open = BigInt(drops.open_ledger_fee ?? drops.base_fee);
   const fee = open > base ? open : base;
   if (fee <= 0n) throw new Error("the network did not return a fee");
+  if (fee > cap) throw new Error("the network fee is higher than this transaction can cost");
   return fee.toString();
 }
 

@@ -213,3 +213,14 @@ export function samePayment(row, { dest, drops }) {
     && row.destination === dest
     && row.amount === String(drops);
 }
+
+// A desktop handoff may confirm only the transaction it showed. Payments keep
+// the amount check. Other types match the type, and the destination when the
+// transaction has one.
+export function sameTransaction(row, account, watch) {
+  if (!row?.ok || !row.hash || row.account !== account) return false;
+  if (watch?.drops != null) return samePayment(row, watch);
+  if (!watch?.type || row.type !== watch.type) return false;
+  if (watch.destination && row.destination !== watch.destination) return false;
+  return true;
+}

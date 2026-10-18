@@ -7,12 +7,13 @@ import {
   parseScan,
   payLink,
   requestLink,
-  samePayment,
+  sameTransaction,
   shortAddress,
 } from "./scan.mjs";
 import { TX_KINDS, transactionFromKind } from "./tx-forms.mjs";
 import {
   asciiHex,
+  base64url,
   bytesToHex,
   derToRaw,
   hexToBytes,
@@ -21,6 +22,7 @@ import {
   prfSalt,
   readMeta,
   sealSeed,
+  sha256,
   utf8,
   xahToDrops,
   xyFromAuthenticatorData,
@@ -279,6 +281,30 @@ function assertionParts(credential) {
   return memoFromWebAuthn({ auth, clientData, sig });
 }
 
+// The seed signs only after this assertion names this transaction, this site,
+// and a user the authenticator verified. The browser bytes still go to the hook.
+async function assertAssertion(credential, challenge) {
+  const response = credential?.response;
+  let client;
+  try {
+    client = JSON.parse(new TextDecoder().decode(response.clientDataJSON));
+  } catch {
+    throw new Error("the passkey approved a different transaction");
+  }
+  if (!client || client.type !== "webauthn.get" || client.challenge !== base64url(challenge)) {
+    throw new Error("the passkey approved a different transaction");
+  }
+  if (client.origin !== location.origin) throw new Error("the passkey was used for a different site");
+  if (client.crossOrigin !== false) throw new Error("the passkey was used inside another site");
+  const auth = new Uint8Array(response.authenticatorData || []);
+  if (auth.length < 37) throw new Error("the passkey did not verify you");
+  const rp = await sha256(new TextEncoder().encode(location.hostname));
+  for (let i = 0; i < 32; i += 1) {
+    if (auth[i] !== rp[i]) throw new Error("the passkey was used for a different site");
+  }
+  if ((auth[32] & 0x05) !== 0x05) throw new Error("the passkey did not verify you");
+}
+
 function idb() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open("p256-wallet", 1);
@@ -526,6 +552,7 @@ async function approve({ account, back, make, needsPublicKey, next, note, retry,
   const go = el("button", {}, ["Approve"]);
   screen(made.summary || "Approve", [
     hint ? el("p", {}, [hint]) : null,
+    el("p", {}, [`${text("networkFee")} ${showAmount(prepared.Fee)} XAH`]),
     el("details", { class: "raw" }, [el("summary", {}, ["Transaction details"]), pre]),
     go,
   ]);
@@ -536,6 +563,7 @@ async function approve({ account, back, make, needsPublicKey, next, note, retry,
       ? await paymentChallenge(api, { sequence: prepared.Sequence, destination: made.payment.destination, drops: made.payment.drops })
       : await txChallenge(api, prepared, holder, definitions);
     const assertion = await getPasskey(challenge, salt, loaded.credentialId);
+    await assertAssertion(assertion, challenge);
     if (!seed) seed = await unlockSeed(account, assertion, loaded.vault);
     const wallet = walletFromSeed(seed);
     if (wallet.address !== account) throw new Error("the sealed seed does not match this account");
@@ -1405,7 +1433,7 @@ async function watchPayment({ account, back, gen, status, watch }) {
     await new Promise((resolve) => setTimeout(resolve, 2000));
     if (gen !== viewGen) return;
     try {
-      const hit = (await recent(account, 8)).find((row) => row.hash && !seen.has(row.hash) && matchesWatch(row, account, watch));
+      const hit = (await recent(account, 8)).find((row) => row.hash && !seen.has(row.hash) && sameTransaction(row, account, watch));
       if (hit) {
         sent(account, back, hit.hash, { hash: hit.hash, result: "tesSUCCESS" });
         return;
@@ -1414,12 +1442,6 @@ async function watchPayment({ account, back, gen, status, watch }) {
       if (gen === viewGen) status.textContent = "Still waiting. The network did not answer just now.";
     }
   }
-}
-
-function matchesWatch(row, account, watch) {
-  if (!row.ok) return false;
-  if (watch.any) return row.account === account;
-  return samePayment(row, watch);
 }
 
 async function openBuilt({ account, kind, values, back }) {
@@ -1448,7 +1470,7 @@ async function openBuilt({ account, kind, values, back }) {
     url: requestLink({ page: location.href, account, kind, values, returnTo: back || "" }),
     watch: preview.payment
       ? { dest: preview.payment.destination, drops: preview.payment.drops }
-      : { any: true },
+      : { type: preview.tx.TransactionType, destination: preview.tx.Destination || "" },
     signHere,
   });
 }
@@ -1783,7 +1805,6 @@ function home() {
       const body = await response.json();
       const secret = body.account?.secret;
       if (!secret) throw new Error(body.error || "the faucet did not return a wallet");
-      sessionStorage.setItem(SEED_KEY, secret);
       screen("Save this seed", [
         el("p", {}, ["This is the account key. The iPhone is required on top of it. Write the seed down, then continue."]),
         el("p", { class: "mono" }, [secret]),
@@ -1800,7 +1821,6 @@ function home() {
     const secret = seed.value.trim();
     if (!secret) return fail(new Error("paste the family seed"));
     if (bad) return fail(new Error(bad));
-    sessionStorage.setItem(SEED_KEY, secret);
     attach(secret, { account: params.get("account") || "", lock: lock.checked }).catch(fail);
   });
 }
@@ -1814,6 +1834,7 @@ function fail(error) {
 
 async function main() {
   applyShell();
+  sessionStorage.removeItem(SEED_KEY);
   if (!globalThis.XrplAccountLib) {
     screen("Signer is incomplete", [el("p", {}, ["The signing library did not load."])]);
     return;
