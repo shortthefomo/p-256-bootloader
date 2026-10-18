@@ -1063,11 +1063,11 @@ async function main() {
     screen("Signer is incomplete", [el("p", {}, ["The signing library did not load."])]);
     return;
   }
-  if (!globalThis.PublicKeyCredential && shell() === "phone") {
+  const op = params.get("op");
+  if (!globalThis.PublicKeyCredential && shell() === "phone" && op !== "scan" && op !== "receive") {
     screen("No passkeys here", [el("p", {}, ["This browser has no WebAuthn. Open the wallet in Safari on the iPhone."])]);
     return;
   }
-  const op = params.get("op");
   try {
     if (op === "qr") {
       const found = parseScan(location.href);

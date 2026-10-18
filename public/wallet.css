@@ -43,7 +43,7 @@ pre.json {
 }
 .balance { font-size: 2rem; font-weight: 700; margin: .2rem 0; }
 nav.tabs { display: flex; gap: .35rem; margin: .4rem 0 1rem; }
-nav.tabs button {
+nav.tabs button, nav.tabs a {
   width: auto;
   flex: 1;
   margin: 0;
@@ -51,8 +51,9 @@ nav.tabs button {
   background: transparent;
   color: #8dffc1;
   border: 1px solid #245c40;
+  text-decoration: none;
 }
-nav.tabs button.on { background: #8dffc1; color: #042; }
+nav.tabs button.on, nav.tabs a.on { background: #8dffc1; color: #042; }
 .tx { padding: .55rem 0; border-top: 1px solid #2a2a2a; }
 html[data-shell="phone"] main { padding-bottom: 5.5rem; }
 html[data-shell="phone"] nav.tabs {

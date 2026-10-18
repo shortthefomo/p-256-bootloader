@@ -30,9 +30,18 @@ function rpc(command, params) {
   });
 }
 
-function go(op, extra) {
-  const query = new URLSearchParams(Object.assign({ op: op, account: acct, return: location.origin + location.pathname }, extra || {}));
-  location.assign(S + (S.indexOf("?") < 0 ? "?" : "&") + query);
+// The ledger page is sandboxed, so its origin is opaque. A scripted
+// location change is rejected there and the page reloads. A real link is a
+// user navigation, which this top-level page is allowed to do.
+function href(op, extra) {
+  const query = new URLSearchParams(Object.assign({ op: op, account: acct }, extra || {}));
+  try {
+    const back = new URL(location.href);
+    back.search = "";
+    back.hash = "";
+    if (back.protocol === "https:") query.set("return", back.origin + back.pathname.replace(/\/$/, ""));
+  } catch (error) {}
+  return S + (S.indexOf("?") < 0 ? "?" : "&") + query;
 }
 
 function showJson(text) {
@@ -87,9 +96,8 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
   if (!passkey) {
     const attach = document.createElement("a");
     attach.className = "b";
-    attach.href = "#";
+    attach.href = href("attach");
     attach.textContent = "Attach iPhone";
-    attach.onclick = function (event) { event.preventDefault(); go("attach"); };
     slot.append(attach);
     return;
   }
@@ -99,58 +107,61 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
   const sendPanel = panel("send");
   const receivePanel = panel("receive");
   const activityPanel = panel("activity");
-  function addTab(label, id) {
-    const button = document.createElement("button");
-    button.type = "button";
+  function addTab(label, id, url) {
+    const button = document.createElement(url ? "a" : "button");
+    if (url) button.href = url;
+    else button.type = "button";
     button.dataset.panel = id;
     button.textContent = label;
-    button.onclick = function () { show(id); };
+    if (!url) button.onclick = function () { show(id); };
     tabs.append(button);
   }
   addTab("Send", "send");
   addTab("Receive", "receive");
-  addTab("Scan", "scan");
+  addTab("Scan", "scan", href("scan"));
   addTab("Activity", "activity");
-  const scanTab = tabs.lastChild.previousSibling;
-  scanTab.onclick = function () { go("scan"); };
 
   const destination = document.createElement("input");
   const amount = document.createElement("input");
-  const sign = document.createElement("button");
+  const sign = document.createElement("a");
   destination.placeholder = "Destination r...";
   amount.placeholder = "Amount XAH";
   amount.inputMode = "decimal";
+  sign.className = "b";
+  sign.href = href("pay");
   sign.textContent = phone ? "Sign with Face ID" : "Show QR for iPhone";
-  sign.onclick = function () {
+  sign.onclick = function (event) {
     const value = amount.value.trim();
-    if (!/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(destination.value.trim())) {
+    const dest = destination.value.trim();
+    if (!/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(dest)) {
+      event.preventDefault();
       m.textContent = "Enter a destination address";
       return;
     }
     if (!/^\d+(\.\d{0,6})?$/.test(value)) {
+      event.preventDefault();
       m.textContent = "Enter an amount";
       return;
     }
-    go("pay", { dest: destination.value.trim(), xah: value });
+    sign.href = href("pay", { dest: dest, xah: value });
   };
   const other = document.createElement("a");
   other.className = "b g";
-  other.href = "#";
+  other.href = href("sign");
   other.textContent = "Other transactions";
-  other.onclick = function (event) { event.preventDefault(); go("sign"); };
   sendPanel.append(destination, amount, sign, other);
 
   const receiveNote = document.createElement("p");
   receiveNote.className = "m";
   receiveNote.textContent = "Show a QR code for this address.";
-  const receive = document.createElement("button");
+  const receive = document.createElement("a");
+  receive.className = "b";
+  receive.href = href("receive");
   receive.textContent = "Show my QR";
-  receive.onclick = function () { go("receive"); };
   const scan = document.createElement("a");
   scan.className = "b g";
-  scan.href = "#";
+  scan.href = href("scan");
   scan.textContent = "Scan a QR code";
-  scan.onclick = function (event) { event.preventDefault(); go("scan"); };
   receivePanel.append(receiveNote, receive, scan);
 
   const activityNote = document.createElement("p");

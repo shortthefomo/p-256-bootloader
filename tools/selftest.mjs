@@ -91,7 +91,9 @@ check("loader loads the github stylesheet", html.includes("https://shortthefomo.
 check("loader loads the github script", html.includes("https://shortthefomo.github.io/p-256-bootloader/wallet.js"));
 check("loader keeps its style off the ledger", !html.includes("<style"));
 check("loader has one script tag", html.split("</script>").length === 2);
-check("wallet script names the namespace", readFileSync(new URL("../public/wallet.js", import.meta.url), "utf8").includes(NAMESPACE));
+const walletJs = readFileSync(new URL("../public/wallet.js", import.meta.url), "utf8");
+check("wallet script names the namespace", walletJs.includes(NAMESPACE));
+check("wallet leaves the ledger through a link", walletJs.includes("function href(") && !walletJs.includes("location.assign"));
 
 let firewall = null;
 try {
