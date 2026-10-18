@@ -15,7 +15,6 @@ import {
 } from "../src/protocol.mjs";
 import {
   FAUCET,
-  HOOK_FEE,
   NAMESPACE,
   PWA_HOST,
   accountBytes,
@@ -63,7 +62,6 @@ async function signedPayment(wallet, passkey, destination, drops) {
     Destination: destination,
     Amount: String(drops),
     Sequence: sequence,
-    Fee: HOOK_FEE,
     Memos: [memoFromWebAuthn(assertion)],
   }, await defs());
 }
@@ -122,7 +120,6 @@ async function main() {
     TransactionType: "Payment",
     Destination: other.address,
     Amount: "1000000",
-    Fee: HOOK_FEE,
   }, definitionsNow);
   record("unsigned payment rejected", bare.result !== "tesSUCCESS", `${bare.result} ${bare.hook}`);
 
@@ -136,7 +133,6 @@ async function main() {
     TransactionType: "Payment",
     Destination: other.address,
     Amount: "1000000",
-    Fee: HOOK_FEE,
   }, definitionsNow);
   record("level 3 blocks an unsigned payment", blocked.result !== "tesSUCCESS", `${blocked.result} ${blocked.hook}`);
 

@@ -28,7 +28,6 @@ import {
 } from "./protocol.mjs";
 import {
   FAUCET,
-  HOOK_FEE,
   NAMESPACE,
   accountBytes,
   accountSetLoaderTx,
@@ -39,6 +38,7 @@ import {
   paymentChallenge,
   prepareFields,
   pwaUrl,
+  requiredFee,
   rpcSocket,
   safeReturn,
   txUrl,
@@ -471,7 +471,10 @@ async function approve({ account, back, make, needsPublicKey }) {
   const fresh = await rpc("account_info", { account, ledger_index: "validated" });
   const made = make(fresh.account_data.Sequence);
   const holder = { address: account, keypair: { publicKey: spk } };
-  const prepared = await prepareFields(rpc, holder, { ...made.tx, Sequence: fresh.account_data.Sequence, Fee: HOOK_FEE });
+  const definitions = await networkDefinitions(api, rpc);
+  const prepared = await prepareFields(rpc, holder, { ...made.tx, Sequence: fresh.account_data.Sequence });
+  // The non-payment challenge covers Fee, so the quote is fixed before the passkey signs.
+  prepared.Fee = await requiredFee(api, rpc, prepared, definitions);
   const pre = el("pre", { class: "json" });
   const paint = () => { pre.textContent = txJson(prepared, spk); };
   paint();
@@ -483,7 +486,6 @@ async function approve({ account, back, make, needsPublicKey }) {
 
   async function finish() {
     go.disabled = true;
-    const definitions = await networkDefinitions(api, rpc);
     const challenge = made.payment
       ? await paymentChallenge(api, { sequence: prepared.Sequence, destination: made.payment.destination, drops: made.payment.drops })
       : await txChallenge(api, prepared, holder, definitions);
@@ -1285,13 +1287,20 @@ function scan(account) {
 }
 
 async function pay({ account, dest, xah, back }) {
-  const drops = xahToDrops(xah);
+  const made = transactionFromKind("Payment", { destination: dest, xah });
+  const drops = made.payment.drops;
   const info = await rpc("account_info", { account, ledger_index: "validated" });
   const balance = BigInt(info.account_data.Balance);
-  if (balance < drops + BigInt(HOOK_FEE)) {
-    throw new Error(`balance is ${dropsToXah(balance)} XAH. This send needs ${dropsToXah(drops + BigInt(HOOK_FEE))} including the fee.`);
+  const api = globalThis.XrplAccountLib;
+  const definitions = await networkDefinitions(api, rpc);
+  const fee = BigInt(await requiredFee(api, rpc, {
+    ...made.tx,
+    Account: account,
+    Sequence: info.account_data.Sequence,
+  }, definitions));
+  if (balance < drops + fee) {
+    throw new Error(`balance is ${dropsToXah(balance)} XAH. This send needs ${dropsToXah(drops + fee)} including the fee.`);
   }
-  const made = transactionFromKind("Payment", { destination: dest, xah });
   if (shell() === "desk") {
     handoff({
       account,

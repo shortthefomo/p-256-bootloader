@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { assertLoaderHtml, loaderChanged, renderBootloader } from "../src/bootloader.mjs";
 import { transactionFromKind } from "../src/tx-forms.mjs";
 import {
   DEVICE_FLAGS,
+  MAX_CLIENT_DATA,
   base64url,
   buildPaymentPayload,
   buildTxPayload,
@@ -63,7 +64,8 @@ const assertion = await signWebAuthn({
   origin: "https://p256.local",
   flags: DEVICE_FLAGS,
 });
-check("clientData has one compact challenge", assertion.clientData.length <= 220 && !assertion.clientData.includes(0x20));
+check("client data cap is 208", MAX_CLIENT_DATA === 208);
+check("clientData has one compact challenge", assertion.clientData.length <= MAX_CLIENT_DATA && !assertion.clientData.includes(0x20));
 const memo = memoFromWebAuthn(assertion);
 check("memo type is the v2 magic", memo.Memo.MemoType === bytesToHex(new TextEncoder().encode("xahau.passkey.v2")));
 check("memo body length matches", hexToBytes(memo.Memo.MemoData).length === 2 + 37 + 2 + assertion.clientData.length + 64);
@@ -108,6 +110,11 @@ check("ledger json starts collapsed", walletJs.includes('createElement("details"
 const signerApp = readFileSync(new URL("../src/signer-app.mjs", import.meta.url), "utf8");
 check("signer json starts collapsed", signerApp.includes('class: "raw"') && signerApp.includes('["Details"]') && signerApp.includes('["Transaction details"]'));
 check("signing does not rename the passkey", !signerApp.includes("signalCurrentUserDetails"));
+const walletSrc = readFileSync(new URL("../src/wallet.mjs", import.meta.url), "utf8");
+const liveSrc = readFileSync(new URL("./live.mjs", import.meta.url), "utf8");
+check("wallet asks the network for the fee", walletSrc.includes("async function requiredFee") && !walletSrc.includes("HOOK_FEE") && !walletSrc.includes("2000000"));
+check("signer does not hardcode the hook fee", !signerApp.includes("HOOK_FEE") && signerApp.includes("requiredFee"));
+check("live test does not hardcode the hook fee", !liveSrc.includes("HOOK_FEE"));
 check("home follows closed ledgers", signerApp.includes('streams: ["ledger"]') && walletJs.includes('streams: ["ledger"]') && walletJs.includes('body.type === "ledgerClosed"'));
 check("scanner reads one crop a frame", signerApp.includes("imageSmoothingEnabled = false") && signerApp.includes("const SCAN = 320") && signerApp.includes("readSquare(guide, 0)"));
 check("home shows issued balances", signerApp.includes("account_lines") && walletJs.includes("account_lines"));
@@ -129,10 +136,17 @@ check("theme defaults to dark", signerHtml.includes('getItem("p256-theme")') && 
 check("same-tab wallet links stay on this tab", !walletJs.slice(walletJs.indexOf("function href("), walletJs.indexOf("function showNote(")).includes("_blank"));
 
 let firewall = null;
-try {
-  firewall = await import("/tmp/passkey_p256_firewall/v2/sign.mjs");
-} catch {
-  firewall = null;
+const firewallCandidates = [
+  "/tmp/passkey_p256_firewall/v2/sign.mjs",
+  path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "passkey_p256_firewall", "v2", "sign.mjs"),
+];
+for (const candidate of firewallCandidates) {
+  try {
+    firewall = await import(pathToFileURL(candidate).href);
+    break;
+  } catch {
+    firewall = null;
+  }
 }
 if (firewall) {
   const theirs = firewall.buildPayload({
@@ -145,7 +159,7 @@ if (firewall) {
   const theirTx = firewall.buildTxPayload({ sequence: 9, txHash: Buffer.alloc(32, 3) });
   check("tx payload matches firewall v2", Buffer.from(txPayload).equals(theirTx));
 } else {
-  console.log("SKIP firewall byte compare (clone not at /tmp/passkey_p256_firewall)");
+  console.log("SKIP firewall byte compare (passkey_p256_firewall clone not found)");
 }
 
 const wasm = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "passkey_p256_firewall_v2.wasm"));

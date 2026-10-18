@@ -1,8 +1,11 @@
 // Ledger calls and the transactions the signer submits.
-// The hook wasm is passkey_p256_firewall v2, unmodified. The sealed family
+// The hook wasm is passkey_p256_firewall v2. The sealed family
 // seed lives in the AppLoader document (ciphertext). The hook never sees it.
 
 import {
+  MAX_AUTH_LEN,
+  MAX_CLIENT_DATA,
+  MAGIC,
   asciiHex,
   bytesToHex,
   buildPaymentPayload,
@@ -43,7 +46,6 @@ export function explorerLinks(hash, networkId = NETWORK_ID) {
 export function txUrl(hash, networkId = NETWORK_ID) {
   return explorerLinks(hash, networkId)[0]?.url || "";
 }
-export const HOOK_FEE = "2000000";
 // "p256boot" then zeros, last byte 0x01. 32 bytes. Not a hook name: the hook
 // stays unnamed so a transaction cannot skip it by omitting HookName.
 export const NAMESPACE = "70323536626F6F74000000000000000000000000000000000000000000000001";
@@ -262,7 +264,7 @@ export async function prepareFields(rpc, wallet, tx) {
     ...tx,
     Account: wallet.address,
     NetworkID: NETWORK_ID,
-    Fee: tx.Fee || HOOK_FEE,
+    Fee: tx.Fee || "0",
     LastLedgerSequence: tx.LastLedgerSequence ?? Number(ledger.ledger_index) + 100,
   };
   if (prepared.Sequence == null) {
@@ -272,8 +274,42 @@ export async function prepareFields(rpc, wallet, tx) {
   return prepared;
 }
 
+// Worst passkey memo the hook will accept. The fee is one drop per memo byte,
+// and a non-payment challenge includes Fee, so the quote has to cover the
+// memo before the passkey exists.
+function passkeyFeeMemo() {
+  const dataBytes = 2 + MAX_AUTH_LEN + 2 + MAX_CLIENT_DATA + 64;
+  return {
+    Memo: {
+      MemoType: asciiHex(MAGIC),
+      MemoData: "00".repeat(dataBytes),
+    },
+  };
+}
+
+export async function requiredFee(api, rpc, tx, definitions) {
+  const probe = { ...tx, Fee: "0", SigningPubKey: "" };
+  delete probe.TxnSignature;
+  delete probe.Signers;
+  if (!probe.Memos) probe.Memos = [passkeyFeeMemo()];
+  if (probe.Sequence == null) probe.Sequence = 1;
+  if (probe.NetworkID == null) probe.NetworkID = NETWORK_ID;
+  const blob = api.sign(probe, api.derive.passphrase(""), definitions).signedTransaction;
+  const quoted = await rpc("fee", { tx_blob: blob });
+  const drops = quoted.drops || {};
+  if (drops.base_fee == null) throw new Error("the network did not return a fee");
+  const base = BigInt(drops.base_fee);
+  const open = BigInt(drops.open_ledger_fee ?? drops.base_fee);
+  const fee = open > base ? open : base;
+  if (fee <= 0n) throw new Error("the network did not return a fee");
+  return fee.toString();
+}
+
 export async function submitTx(api, rpc, wallet, tx, definitions) {
   const prepared = await prepareFields(rpc, wallet, tx);
+  if (!prepared.Fee || prepared.Fee === "0") {
+    prepared.Fee = await requiredFee(api, rpc, prepared, definitions);
+  }
   const signed = api.sign(prepared, wallet, definitions);
   const submitted = await rpc("submit", { tx_blob: signed.signedTransaction });
   const prelim = submitted.engine_result || "";
@@ -311,10 +347,8 @@ export async function firewallBlock(rpc, wasmHex) {
 }
 
 export function setHookTx(wasmHex) {
-  const bytes = wasmHex.length / 2;
   return {
     TransactionType: "SetHook",
-    Fee: String(bytes * 500 + 2_000_000),
     Hooks: [
       {
         Hook: {
@@ -345,7 +379,6 @@ export function accountSetLoaderTx(html) {
   const bytes = new TextEncoder().encode(html);
   return {
     TransactionType: "AccountSet",
-    Fee: String(Math.max(Number(HOOK_FEE), bytes.length + 1000)),
     AppLoader: bytesToHex(bytes),
   };
 }

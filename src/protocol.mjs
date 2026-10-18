@@ -1,8 +1,10 @@
 // Passkey payload, memo, and seed vault. Shared by the node tests and the signer page.
-// The memo layout matches passkey_p256_firewall v2 (commit 168e6b11).
+// The memo layout matches passkey_p256_firewall v2 (commit 17dc923).
 
 export const MAGIC = "xahau.passkey.v2";
 export const PAYLOAD_LEN = 53;
+export const MAX_AUTH_LEN = 128;
+export const MAX_CLIENT_DATA = 208;
 export const TX_KIND = 2;
 export const FLAG_UP = 0x01;
 export const FLAG_UV = 0x04;
@@ -147,9 +149,11 @@ export async function signWebAuthn({ pkcs8, payload, rpId, origin, flags = DEVIC
 }
 
 export function memoFromWebAuthn({ auth, clientData, sig }) {
-  if (auth.length < 37 || auth.length > 128) throw new Error("authenticatorData must be 37 to 128 bytes");
-  if (clientData.length < 1 || clientData.length > 220) {
-    throw new Error("clientDataJSON must be 1 to 220 bytes");
+  if (auth.length < 37 || auth.length > MAX_AUTH_LEN) {
+    throw new Error(`authenticatorData must be 37 to ${MAX_AUTH_LEN} bytes`);
+  }
+  if (clientData.length < 1 || clientData.length > MAX_CLIENT_DATA) {
+    throw new Error(`clientDataJSON must be 1 to ${MAX_CLIENT_DATA} bytes`);
   }
   if (sig.length !== 64) throw new Error("signature must be 64 bytes");
   const body = new Uint8Array(2 + auth.length + 2 + clientData.length + 64);

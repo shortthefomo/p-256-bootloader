@@ -36,7 +36,7 @@ The bootloader then lives at `https://pwa.passkey.xahau-dev.net/<account>`. A pa
 
 ## Levels
 
-The hook is [v2 of passkey_p256_firewall](https://github.com/shortthefomo/passkey_p256_firewall/tree/main/v2) (`168e6b11`), wasm in `public/passkey_p256_firewall_v2.wasm`. It is not renamed.
+The hook is [v2 of passkey_p256_firewall](https://github.com/shortthefomo/passkey_p256_firewall/tree/main/v2) (`17dc923`), wasm in `public/passkey_p256_firewall_v2.wasm`. It is not renamed.
 
 | Level | What needs the passkey |
 | --- | --- |
