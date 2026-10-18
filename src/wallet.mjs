@@ -228,7 +228,8 @@ export function stateValue(namespace, keyAscii) {
 }
 
 // Unset LV is level 1. Level 3 gates SetHook, and the hook can only hash a
-// transaction of at most 2048 bytes, so a wasm install has to follow a delete.
+// transaction of at most 2048 bytes. Level 2 still gates payments and account
+// changes, and it lets SetHook through, so an update can replace the hook in place.
 export function hookLevel(namespace) {
   const raw = stateValue(namespace, "LV");
   if (!raw) return 1;
@@ -378,16 +379,6 @@ export function setHookTx(wasmHex) {
   };
 }
 
-// Level 3 rejects a SetHook that carries the wasm: the serialized transaction
-// is larger than the 2048 bytes the hook can hash. An empty override deletes
-// the hook and leaves the namespace, so the passkey state survives.
-export function clearHookTx() {
-  return {
-    TransactionType: "SetHook",
-    Hooks: [{ Hook: { CreateCode: "", Flags: 1 } }],
-  };
-}
-
 export function invokeTx(pairs) {
   return {
     TransactionType: "Invoke",
@@ -398,6 +389,13 @@ export function invokeTx(pairs) {
       },
     })),
   };
+}
+
+// LV is one raw byte. Level 2 keeps the hook installed and lets SetHook through.
+export function levelTx(level) {
+  const byte = Number(level);
+  if (byte !== 1 && byte !== 2 && byte !== 3) throw new Error("firewall level must be 1, 2, or 3");
+  return invokeTx([["LV", byte.toString(16).padStart(2, "0")]]);
 }
 
 export function accountSetLoaderTx(html) {

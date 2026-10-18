@@ -45,9 +45,9 @@ import {
   rpcSocket,
   safeReturn,
   txUrl,
-  clearHookTx,
   firewallBlock,
   hookLevel,
+  levelTx,
   setHookTx,
   stateValue,
   submitTx,
@@ -65,6 +65,7 @@ const SHELL_KEY = "p256-shell";
 const THEME_KEY = "p256-theme";
 const LANG_KEY = "p256-lang";
 const FORMAT_KEY = "p256-format";
+const RESTORE_KEY = "p256-restore-level";
 let viewGen = 0;
 let stopCamera = () => {};
 let stopWatch = () => {};
@@ -500,7 +501,7 @@ function rejected(account, back, error, retry) {
   ]);
 }
 
-async function approve({ account, back, make, needsPublicKey, next, note, retry, hint }) {
+async function approve({ account, back, make, needsPublicKey, next, note, retry, hint, pending }) {
   const loaded = await loadAccount(account);
   const api = globalThis.XrplAccountLib;
   const idBytes = accountBytes(api, account);
@@ -544,10 +545,12 @@ async function approve({ account, back, make, needsPublicKey, next, note, retry,
     const tx = await submitTx(api, rpc, wallet, { ...prepared, Memos: [assertionParts(assertion)] }, definitions);
     if (tx.result !== "tesSUCCESS") throw new Error(`${tx.result} ${tx.hook}`.trim());
     if (next) {
+      if (pending) go.textContent = pending;
       try {
-        await next();
+        await next({ wallet, api, definitions, tx });
       } catch (error) {
-        throw new Error(`${text("firewallRemoved")} ${error.message || error}`);
+        const detail = error.message || String(error);
+        throw new Error(note && !detail.includes(note) ? `${note} ${detail}` : detail);
       }
       return;
     }
@@ -776,34 +779,52 @@ function paintGeneral(body, account) {
 }
 
 async function accountLevel(account) {
+  const namespace = await rpc("account_namespace", { account, namespace_id: NAMESPACE, ledger_index: "validated" });
+  return hookLevel(namespace);
+}
+
+function restorePending(account) {
   try {
-    const namespace = await rpc("account_namespace", { account, namespace_id: NAMESPACE, ledger_index: "validated" });
-    return hookLevel(namespace);
+    return localStorage.getItem(RESTORE_KEY) === account;
   } catch {
-    return 3;
+    return false;
   }
 }
 
-async function quoteHookFee(account, replace) {
+function rememberRestore(account) {
+  try {
+    localStorage.setItem(RESTORE_KEY, account);
+  } catch {
+    // The Version tab can still finish the update in this tab.
+  }
+}
+
+function clearRestore(account) {
+  try {
+    if (localStorage.getItem(RESTORE_KEY) === account) localStorage.removeItem(RESTORE_KEY);
+  } catch {
+    // The level is already restored on the ledger.
+  }
+}
+
+async function quoteHookFee(account, parts) {
   const api = globalThis.XrplAccountLib;
   const [code, info, definitions] = await Promise.all([
-    wasmHex(),
+    parts.includes("install") ? wasmHex() : "",
     rpc("account_info", { account, ledger_index: "validated" }),
     networkDefinitions(api, rpc),
   ]);
   const sequence = info.account_data.Sequence;
-  const install = BigInt(await requiredFee(api, rpc, {
-    ...setHookTx(code),
-    Account: account,
-    Sequence: sequence,
-  }, definitions));
-  if (!replace || await accountLevel(account) < 3) return install.toString();
-  const remove = BigInt(await requiredFee(api, rpc, {
-    ...clearHookTx(),
-    Account: account,
-    Sequence: sequence,
-  }, definitions));
-  return (install + remove).toString();
+  let total = 0n;
+  for (const part of parts) {
+    const tx = part === "install" ? setHookTx(code) : levelTx(part === "lower" ? 2 : 3);
+    total += BigInt(await requiredFee(api, rpc, {
+      ...tx,
+      Account: account,
+      Sequence: sequence,
+    }, definitions));
+  }
+  return total.toString();
 }
 
 async function installFirewall(account, back) {
@@ -818,36 +839,102 @@ async function installFirewall(account, back) {
   });
 }
 
+async function raiseFirewall(account, back) {
+  const retry = () => settings(account, "version");
+  await approve({
+    account,
+    back,
+    needsPublicKey: true,
+    retry,
+    note: text("firewallLevel2"),
+    hint: text("firewallLevel2"),
+    make: () => ({ summary: text("restoreLevel"), payment: null, tx: levelTx(3) }),
+    next: ({ tx }) => {
+      clearRestore(account);
+      sent(account, back, tx.hash, tx.validated);
+    },
+  });
+}
+
+// Level 3 cannot hash a SetHook that carries the wasm. Level 2 still requires
+// the passkey for payments and account changes, and it accepts SetHook, so the
+// replacement lands while the current firewall is installed.
+async function updateInPlace(account, back) {
+  const code = await wasmHex();
+  const block = await firewallBlock(rpc, code);
+  if (block) throw new Error(block);
+  const api = globalThis.XrplAccountLib;
+  const [info, definitions] = await Promise.all([
+    rpc("account_info", { account, ledger_index: "validated" }),
+    networkDefinitions(api, rpc),
+  ]);
+  const ledger = await rpc("ledger", { ledger_index: "validated" });
+  const lastLedger = Number(ledger.ledger_index) + 100;
+  const installFee = await requiredFee(api, rpc, {
+    ...setHookTx(code),
+    Account: account,
+    Sequence: info.account_data.Sequence,
+    LastLedgerSequence: lastLedger,
+  }, definitions);
+  rememberRestore(account);
+  const retry = () => settings(account, "version");
+  await approve({
+    account,
+    back,
+    needsPublicKey: true,
+    retry,
+    hint: text("firewallTwoStep"),
+    pending: text("installingFirewall"),
+    note: text("firewallLevel2"),
+    make: () => ({ summary: text("lowerFirewall"), payment: null, tx: levelTx(2) }),
+    next: async ({ wallet, api: lib, definitions: defs }) => {
+      const installed = await submitTx(lib, rpc, wallet, {
+        ...setHookTx(code),
+        Fee: installFee,
+        LastLedgerSequence: lastLedger,
+      }, defs);
+      if (installed.result !== "tesSUCCESS") throw new Error(`${installed.result} ${installed.hook}`.trim());
+      await raiseFirewall(account, back);
+    },
+  });
+}
+
+async function installThenRaise(account, back) {
+  const code = await wasmHex();
+  const block = await firewallBlock(rpc, code);
+  if (block) throw new Error(block);
+  const retry = () => settings(account, "version");
+  await approve({
+    account,
+    back,
+    needsPublicKey: true,
+    retry,
+    note: text("firewallLevel2"),
+    hint: text("firewallLevel2"),
+    make: () => ({ summary: text("installFirewall"), payment: null, tx: setHookTx(code) }),
+    next: () => raiseFirewall(account, back),
+  });
+}
+
 async function startHookUpdate(account) {
   const back = safeReturn(params.get("return") || "", account) || pwaUrl(account);
-  // A failed read must not fall through into a wasm SetHook. At level 3 that
-  // transaction is larger than the hook can hash, which is the rejection we
-  // are avoiding.
   const hook = await installedHook(account);
-  // Level 3 hashes the whole transaction and stops at 2048 bytes. The wasm
-  // does not fit, so the passkey first deletes the hook, then installs it.
-  if (hook.hash && await accountLevel(account) >= 3) {
-    const code = await wasmHex();
-    const block = await firewallBlock(rpc, code);
-    if (block) throw new Error(block);
-    const retry = () => settings(account, "version");
-    await approve({
-      account,
-      back,
-      needsPublicKey: true,
-      retry,
-      hint: text("firewallTwoStep"),
-      make: () => ({ summary: text("removeFirewall"), payment: null, tx: clearHookTx() }),
-      next: () => approve({
-        account,
-        back,
-        needsPublicKey: true,
-        note: text("firewallRemoved"),
-        hint: text("firewallRemoved"),
-        retry,
-        make: () => ({ summary: text("installFirewall"), payment: null, tx: setHookTx(code) }),
-      }),
-    });
+  if (!hook.hash) {
+    await installFirewall(account, back);
+    return;
+  }
+  const level = await accountLevel(account);
+  const pending = restorePending(account);
+  if (level >= 3 && hook.hash !== HOOK_HASH) {
+    await updateInPlace(account, back);
+    return;
+  }
+  if (pending && level < 3 && hook.hash === HOOK_HASH) {
+    await raiseFirewall(account, back);
+    return;
+  }
+  if (pending && level < 3) {
+    await installThenRaise(account, back);
     return;
   }
   await installFirewall(account, back);
@@ -883,6 +970,14 @@ async function paintVersion(body, account) {
     versionRows(hookRows),
   ];
   const replace = Boolean(hook?.hash && hook.hash !== HOOK_HASH);
+  let level = null;
+  if (hook?.hash) {
+    try {
+      level = await accountLevel(account);
+    } catch {
+      level = null;
+    }
+  }
   let restore = false;
   if (hook && !hook.hash) {
     try {
@@ -892,20 +987,27 @@ async function paintVersion(body, account) {
       restore = false;
     }
   }
+  const pending = restorePending(account);
+  const raiseOnly = Boolean(pending && hook?.hash === HOOK_HASH && level != null && level < 3);
+  const finish = Boolean(pending && replace && level != null && level < 3);
   if (gen !== viewGen) return;
-  if (replace || restore) {
-    const label = text(replace ? "updateFirewall" : "installFirewall");
-    const button = el("button", { type: "button" }, [text("checkingFee")]);
+  if (pending && level != null && level < 3) hookNodes.push(el("p", { class: "warn" }, [text("firewallLevel2")]));
+  if (replace || restore || raiseOnly) {
+    const label = text(raiseOnly ? "restoreLevel" : finish ? "finishUpdate" : replace ? "updateFirewall" : "installFirewall");
+    const parts = raiseOnly ? ["raise"] : level >= 3 && replace ? ["lower", "install", "raise"] : finish ? ["install", "raise"] : ["install"];
+    const button = el("button", { type: "button" }, [level == null && replace ? label : text("checkingFee")]);
     button.addEventListener("click", () => {
       button.disabled = true;
       startHookUpdate(account).catch((error) => rejected(account, back, error));
     });
     hookNodes.push(button);
-    quoteHookFee(account, replace).then((fee) => {
-      if (gen === viewGen) button.textContent = `${label} · ${showAmount(fee)} XAH`;
-    }).catch(() => {
-      if (gen === viewGen) button.textContent = label;
-    });
+    if (level != null || !replace) {
+      quoteHookFee(account, parts).then((fee) => {
+        if (gen === viewGen) button.textContent = `${label} · ${showAmount(fee)} XAH`;
+      }).catch(() => {
+        if (gen === viewGen) button.textContent = label;
+      });
+    }
   }
   hookCard.replaceChildren(...hookNodes);
   const pageKey = !page.published ? "interfaceMissing" : page.stale ? "interfaceDiffers" : "interfaceMatches";

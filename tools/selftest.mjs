@@ -26,7 +26,7 @@ import {
 import { decodeImage, decodeQr, encodeQr, rasterQr } from "../src/qr.mjs";
 import { describeTx, kindFromTx, parseScan, payLink, requestLink, samePayment, shortAddress } from "../src/scan.mjs";
 import { AMOUNT_FORMATS, LANGUAGES, canonicalAmount, formatDrops, translate } from "../src/locale.mjs";
-import { EXPLORER, HOOK_HASH, HOOK_ON, INTERFACE_REV, NAMESPACE, accountBytes, clearHookTx, explorerUrls, hookLevel, safeReturn, stateValue, txUrl } from "../src/wallet.mjs";
+import { EXPLORER, HOOK_HASH, HOOK_ON, INTERFACE_REV, NAMESPACE, accountBytes, explorerUrls, hookLevel, levelTx, safeReturn, stateValue, txUrl } from "../src/wallet.mjs";
 import { createHash } from "node:crypto";
 import { generate, libraries } from "xrpl-accountlib";
 
@@ -116,13 +116,15 @@ check("an unknown language uses English", translate("zz", "settings") === "Setti
 check("chinese japanese and korean are listed", ["zh", "ja", "ko"].every((id) => LANGUAGES.some((item) => item.id === id)) && translate("zh", "settings") === "设置" && translate("ja", "settings") === "設定" && translate("ko", "settings") === "설정" && walletJs.includes('"ko"') && walletJs.includes("한국어") && walletJs.includes("中文") && walletJs.includes("日本語"));
 check("layout choice sits in general", signerApp.includes('text("layout")') && signerApp.includes('chooseShell("desk")') && !signerApp.includes("function layoutSwitch") && walletJs.includes('shellButton("phone", "mobile")') && walletJs.includes('shellButton("desk", "desktop")') && translate("en", "mobile") === "Mobile" && translate("en", "desktop") === "Desktop");
 const localeSrc = readFileSync(new URL("../src/locale.mjs", import.meta.url), "utf8");
-check("level 3 firewall update deletes before it installs", hookLevel({}) === 1 && hookLevel({ namespace_entries: [{ HookStateKey: "4C56".padStart(64, "0"), HookStateData: "03" }] }) === 3 && clearHookTx().Hooks[0].Hook.CreateCode === "" && clearHookTx().Hooks[0].Hook.Flags === 1 && !("HookNamespace" in clearHookTx().Hooks[0].Hook) && signerApp.includes("if (hook.hash && await accountLevel(account) >= 3)") && signerApp.includes("tx: clearHookTx()") && !signerApp.includes("installedHook(account).catch(() => null);") && translate("en", "removeFirewall") === "Remove the current firewall" && ["too large", "no cabe", "ne tient pas", "passt nicht", "não cabe", "太大", "大きすぎ", "너무 큽니다"].every((part) => localeSrc.includes(part)));
+let badLevel = false;
+try { levelTx(4); } catch { badLevel = true; }
+check("level 3 firewall update keeps the hook installed", hookLevel({}) === 1 && hookLevel({ namespace_entries: [{ HookStateKey: "4C56".padStart(64, "0"), HookStateData: "03" }] }) === 3 && hookLevel({ namespace_entries: [{ HookStateKey: "4C56".padStart(64, "0"), HookStateData: "02" }] }) === 2 && levelTx(2).TransactionType === "Invoke" && levelTx(2).HookParameters[0].HookParameter.HookParameterValue === "02" && levelTx(3).HookParameters[0].HookParameter.HookParameterValue === "03" && badLevel && !signerApp.includes("clearHookTx") && signerApp.includes("levelTx(2)") && signerApp.includes("setHookTx(code)") && signerApp.includes("p256-restore-level") && translate("en", "lowerFirewall") === "Lower the firewall to level 2" && ["stays installed", "sigue instalado", "reste installé", "bleibt installiert", "continua instalado", "仍会留在", "導入されたまま", "설치된 채로"].every((part) => localeSrc.includes(part)));
 check("ledger json starts collapsed", walletJs.includes('createElement("details")') && walletJs.includes("raw.open = false"));
 check("signer json starts collapsed", signerApp.includes('class: "raw"') && signerApp.includes('["Details"]') && signerApp.includes('["Transaction details"]'));
 check("signing does not rename the passkey", !signerApp.includes("signalCurrentUserDetails"));
 const walletSrc = readFileSync(new URL("../src/wallet.mjs", import.meta.url), "utf8");
 const liveSrc = readFileSync(new URL("./live.mjs", import.meta.url), "utf8");
-check("wallet asks the network for the fee", walletSrc.includes("async function requiredFee") && !walletSrc.includes("HOOK_FEE") && !walletSrc.includes("2000000"));
+check("wallet asks the network for the fee", walletSrc.includes("async function requiredFee") && walletSrc.includes("function levelTx") && !walletSrc.includes("clearHookTx") && !walletSrc.includes("HOOK_FEE") && !walletSrc.includes("2000000"));
 check("signer does not hardcode the hook fee", !signerApp.includes("HOOK_FEE") && signerApp.includes("requiredFee"));
 check("live test does not hardcode the hook fee", !liveSrc.includes("HOOK_FEE"));
 check("home follows closed ledgers", signerApp.includes('streams: ["ledger"]') && walletJs.includes('streams: ["ledger"]') && walletJs.includes('body.type === "ledgerClosed"'));
