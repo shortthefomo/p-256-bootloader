@@ -56,6 +56,7 @@ const ACCOUNT_KEY = "p256-account";
 const SHELL_KEY = "p256-shell";
 let viewGen = 0;
 let stopCamera = () => {};
+let stopWatch = () => {};
 
 function shell() {
   return document.documentElement.dataset.shell === "desk" ? "desk" : "phone";
@@ -92,6 +93,8 @@ function el(tag, attrs = {}, children = []) {
 
 function screen(title, nodes, mode = "") {
   stopCamera();
+  stopWatch();
+  stopWatch = () => {};
   viewGen += 1;
   app.replaceChildren(
     el("header", { class: "top" }, [el("h1", {}, [title])]),
@@ -648,6 +651,41 @@ async function recent(account, limit) {
   return (page.transactions || []).map(describeTx);
 }
 
+// Validated balance and history move when a ledger closes. The watch ends
+// when the home screen is replaced.
+function followLedgers(account, gen, paint) {
+  let busy = false;
+  let again = false;
+  const refresh = () => {
+    if (gen !== viewGen) return;
+    if (busy) {
+      again = true;
+      return;
+    }
+    busy = true;
+    Promise.all([
+      rpc("account_info", { account, ledger_index: "validated" }),
+      recent(account, 6).catch(() => null),
+    ]).then(([info, rows]) => {
+      if (gen !== viewGen) return;
+      paint(dropsToXah(info.account_data.Balance), rows);
+    }).catch(() => {}).finally(() => {
+      busy = false;
+      if (again && gen === viewGen) {
+        again = false;
+        refresh();
+      }
+    });
+  };
+  stopWatch = rpc.subscribe({ accounts: [account], streams: ["ledger"] }, (message) => {
+    if (gen !== viewGen) {
+      stopWatch();
+      return;
+    }
+    if (message.type === "ledgerClosed") refresh();
+  });
+}
+
 function askAccount(done) {
   const input = el("input", { type: "text", placeholder: "Your account r…", autocomplete: "off", spellcheck: "false" });
   const go = el("button", { type: "button" }, ["Continue"]);
@@ -681,11 +719,22 @@ async function walletHome(account) {
       rows = [];
     }
     if (gen !== viewGen) return;
-    const balance = dropsToXah(info.account_data.Balance);
     const stale = await pageIsStale(account);
     if (gen !== viewGen) return;
+    const amount = document.createTextNode(dropsToXah(info.account_data.Balance));
+    const feed = el("div", { class: "feed" });
+    let shownRows = null;
+    const paint = (balance, nextRows) => {
+      if (amount.data !== balance) amount.data = balance;
+      if (!nextRows) return;
+      const signature = nextRows.map((row) => `${row.hash}:${row.ok}`).join(" ");
+      if (signature === shownRows) return;
+      shownRows = signature;
+      feed.replaceChildren(txList(nextRows));
+    };
+    paint(amount.data, rows);
     const hero = [
-      el("p", { class: "balance" }, [balance, el("span", {}, [" XAH"])]),
+      el("p", { class: "balance" }, [amount, el("span", {}, [" XAH"])]),
       addressRow(account),
       stale ? updateBanner(account) : null,
     ];
@@ -693,18 +742,19 @@ async function walletHome(account) {
       screen("Wallet", [
         el("div", { class: "hero" }, hero.filter(Boolean)),
         el("div", { class: "dash" }, [
-          el("section", { class: "card" }, [el("h2", {}, ["Activity"]), txList(rows)]),
+          el("section", { class: "card" }, [el("h2", {}, ["Activity"]), feed]),
           el("section", { class: "card" }, [el("h2", {}, ["Receive"]), ...receiveParts(account)]),
         ]),
       ], "home");
-      return;
+    } else {
+      screen("Wallet", [
+        ...hero,
+        el("h2", {}, ["Activity"]),
+        feed,
+        layoutSwitch(),
+      ], "home");
     }
-    screen("Wallet", [
-      ...hero,
-      el("h2", {}, ["Activity"]),
-      txList(rows),
-      layoutSwitch(),
-    ], "home");
+    followLedgers(account, viewGen, paint);
   } catch (error) {
     if (gen !== viewGen) return;
     screen("Wallet", [

@@ -107,6 +107,7 @@ check("ledger json starts collapsed", walletJs.includes('createElement("details"
 const signerApp = readFileSync(new URL("../src/signer-app.mjs", import.meta.url), "utf8");
 check("signer json starts collapsed", signerApp.includes('class: "raw"') && signerApp.includes('["Details"]') && signerApp.includes('["Transaction details"]'));
 check("signing does not rename the passkey", !signerApp.includes("signalCurrentUserDetails"));
+check("home follows closed ledgers", signerApp.includes('streams: ["ledger"]') && walletJs.includes('streams: ["ledger"]') && walletJs.includes('body.type === "ledgerClosed"'));
 
 let firewall = null;
 try {

@@ -55,7 +55,36 @@ export function rpcSocket(url = RPC_WSS) {
   let socket = null;
   let next = 1;
   const pending = new Map();
+  const listeners = new Set();
+  const subscriptions = [];
   let opening = null;
+  let retry = null;
+  let retryWait = 1000;
+
+  function failPending(error) {
+    for (const waiter of pending.values()) waiter.reject(error);
+    pending.clear();
+  }
+
+  function send(command, params) {
+    const id = next++;
+    return new Promise((resolve, reject) => {
+      pending.set(id, { resolve, reject });
+      socket.send(JSON.stringify({ id, command, ...params }));
+    });
+  }
+
+  // Subscriptions are remembered so a dropped socket asks for them again.
+  function announce() {
+    if (!socket || socket.readyState !== 1) return;
+    for (const sub of subscriptions) {
+      if (sub.live) continue;
+      sub.live = true;
+      send("subscribe", sub.params).catch(() => {
+        sub.live = false;
+      });
+    }
+  }
 
   function connect() {
     if (socket && socket.readyState === 1) return Promise.resolve();
@@ -65,27 +94,51 @@ export function rpcSocket(url = RPC_WSS) {
       sock.onopen = () => {
         socket = sock;
         opening = null;
+        retryWait = 1000;
+        for (const sub of subscriptions) sub.live = false;
         resolve();
+        announce();
       };
       sock.onerror = () => {
         opening = null;
         reject(new Error("cannot reach the network"));
       };
       sock.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        const waiter = pending.get(message.id);
-        if (!waiter) return;
-        pending.delete(message.id);
-        if (message.status && message.status !== "success") {
-          const error = new Error(message.error_message || message.error || message.status);
-          error.code = message.error;
-          waiter.reject(error);
-        } else {
-          waiter.resolve(message.result);
+        let message;
+        try {
+          message = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        const waiter = message.id != null ? pending.get(message.id) : null;
+        if (waiter) {
+          pending.delete(message.id);
+          if (message.status && message.status !== "success") {
+            const error = new Error(message.error_message || message.error || message.status);
+            error.code = message.error;
+            waiter.reject(error);
+          } else {
+            waiter.resolve(message.result);
+          }
+          return;
+        }
+        for (const listener of listeners) {
+          try {
+            listener(message);
+          } catch {
+            // One listener cannot stop the others.
+          }
         }
       };
       sock.onclose = () => {
-        socket = null;
+        if (socket === sock) socket = null;
+        failPending(new Error("connection closed"));
+        if (!subscriptions.length) return;
+        clearTimeout(retry);
+        retry = setTimeout(() => {
+          connect().catch(() => {});
+        }, retryWait);
+        retryWait = Math.min(retryWait * 2, 15000);
       };
     });
     return opening;
@@ -93,13 +146,26 @@ export function rpcSocket(url = RPC_WSS) {
 
   async function rpc(command, params = {}) {
     await connect();
-    const id = next++;
-    return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
-      socket.send(JSON.stringify({ id, command, ...params }));
-    });
+    return send(command, params);
   }
+
+  rpc.subscribe = (params, listener) => {
+    const sub = { params, live: false };
+    subscriptions.push(sub);
+    listeners.add(listener);
+    connect().then(announce).catch(() => {});
+    return () => {
+      const index = subscriptions.indexOf(sub);
+      if (index >= 0) subscriptions.splice(index, 1);
+      listeners.delete(listener);
+      if (!subscriptions.length) clearTimeout(retry);
+      if (socket && socket.readyState === 1) send("unsubscribe", params).catch(() => {});
+    };
+  };
+
   rpc.close = () => {
+    subscriptions.splice(0, subscriptions.length);
+    clearTimeout(retry);
     if (socket) socket.close();
     socket = null;
   };

@@ -112,9 +112,77 @@ else if (txHash) {
   }).catch(function () {});
 }
 
+let activityPanel = null;
+let activityNote = null;
+
+function paintActivity(rows) {
+  if (!activityPanel || !activityNote) return;
+  const old = activityPanel.querySelectorAll(".tx");
+  for (let i = 0; i < old.length; i++) old[i].remove();
+  activityNote.textContent = rows.length ? "" : "No transactions yet.";
+  rows.forEach(function (entry) {
+    const tx = entry.tx_json || entry.tx || {};
+    const line = document.createElement("div");
+    line.className = "tx";
+    let text = tx.TransactionType || "Transaction";
+    if (text === "Payment" && typeof tx.Amount === "string") text = xah(tx.Amount) + " XAH";
+    if (tx.Destination) text += " → " + tx.Destination.slice(0, 6) + "…" + tx.Destination.slice(-4);
+    line.textContent = text;
+    activityPanel.append(line);
+  });
+}
+
+let refreshing = false;
+let refreshAgain = false;
+function refreshHome() {
+  if (!acct) return;
+  if (refreshing) {
+    refreshAgain = true;
+    return;
+  }
+  refreshing = true;
+  rpc("account_info", { account: acct, ledger_index: "validated" }).then(function (info) {
+    $("b").textContent = xah(info.account_data.Balance);
+    return rpc("account_tx", { account: acct, limit: 8 });
+  }).then(function (page) {
+    if (page) paintActivity(page.transactions || []);
+  }).catch(function () {}).then(function () {
+    refreshing = false;
+    if (refreshAgain) {
+      refreshAgain = false;
+      refreshHome();
+    }
+  });
+}
+
 rpc("account_info", { account: acct, ledger_index: "validated" }).then(function (info) {
   $("b").textContent = xah(info.account_data.Balance);
 }).catch(function (error) { showNote(error.message); });
+
+// Each closed ledger can change the validated balance and the history.
+function watchLedgers() {
+  if (!acct) return;
+  let ws = null;
+  let wait = 1000;
+  function open() {
+    ws = new WebSocket("wss://passkey.xahau-dev.net");
+    ws.onopen = function () {
+      wait = 1000;
+      ws.send(JSON.stringify({ id: 1, command: "subscribe", accounts: [acct], streams: ["ledger"] }));
+    };
+    ws.onmessage = function (event) {
+      let body;
+      try { body = JSON.parse(event.data); } catch (error) { return; }
+      if (body.type === "ledgerClosed") refreshHome();
+    };
+    ws.onclose = function () {
+      setTimeout(open, wait);
+      wait = Math.min(wait * 2, 15000);
+    };
+  }
+  open();
+}
+watchLedgers();
 
 function panel(id) {
   const node = document.createElement("div");
@@ -149,7 +217,7 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
 
   const sendPanel = panel("send");
   const receivePanel = panel("receive");
-  const activityPanel = panel("activity");
+  activityPanel = panel("activity");
   function heading(text) {
     const h = document.createElement("h2");
     h.textContent = text;
@@ -199,23 +267,12 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
   scan.textContent = "Scan a QR code";
   receivePanel.append(heading("Receive"), receiveNote, receive, scan);
 
-  const activityNote = document.createElement("p");
+  activityNote = document.createElement("p");
   activityNote.className = "m";
   activityNote.textContent = "Loading activity…";
   activityPanel.append(heading("Activity"), activityNote);
   rpc("account_tx", { account: acct, limit: 8 }).then(function (page) {
-    const rows = page.transactions || [];
-    activityNote.textContent = rows.length ? "" : "No transactions yet.";
-    rows.forEach(function (entry) {
-      const tx = entry.tx_json || entry.tx || {};
-      const line = document.createElement("div");
-      line.className = "tx";
-      let text = tx.TransactionType || "Transaction";
-      if (text === "Payment" && typeof tx.Amount === "string") text = xah(tx.Amount) + " XAH";
-      if (tx.Destination) text += " → " + tx.Destination.slice(0, 6) + "…" + tx.Destination.slice(-4);
-      line.textContent = text;
-      activityPanel.append(line);
-    });
+    paintActivity(page.transactions || []);
   }).catch(function () { activityNote.textContent = "Activity is unavailable."; });
 
   const layout = document.createElement("div");
