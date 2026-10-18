@@ -227,6 +227,15 @@ export function stateValue(namespace, keyAscii) {
   return entry?.HookStateData || "";
 }
 
+// Unset LV is level 1. Level 3 gates SetHook, and the hook can only hash a
+// transaction of at most 2048 bytes, so a wasm install has to follow a delete.
+export function hookLevel(namespace) {
+  const raw = stateValue(namespace, "LV");
+  if (!raw) return 1;
+  const byte = Number.parseInt(raw.slice(0, 2), 16);
+  return Number.isFinite(byte) ? byte : 3;
+}
+
 export function hookText(tx) {
   const meta = tx.meta || tx.metaData || {};
   const execs = meta.HookExecutions || [];
@@ -366,6 +375,16 @@ export function setHookTx(wasmHex) {
         },
       },
     ],
+  };
+}
+
+// Level 3 rejects a SetHook that carries the wasm: the serialized transaction
+// is larger than the 2048 bytes the hook can hash. An empty override deletes
+// the hook and leaves the namespace, so the passkey state survives.
+export function clearHookTx() {
+  return {
+    TransactionType: "SetHook",
+    Hooks: [{ Hook: { CreateCode: "", Flags: 1 } }],
   };
 }
 

@@ -45,7 +45,9 @@ import {
   rpcSocket,
   safeReturn,
   txUrl,
+  clearHookTx,
   firewallBlock,
+  hookLevel,
   setHookTx,
   stateValue,
   submitTx,
@@ -484,14 +486,21 @@ function txJson(prepared, pubkey) {
   return JSON.stringify(view, null, 2);
 }
 
-function rejected(account, back, error) {
+function rejected(account, back, error, retry) {
   screen("Transaction was not sent", [
     el("p", {}, [error.message || String(error)]),
-    el("button", { class: "ghost", onclick: () => (back ? location.assign(back) : composer({ account, back })) }, ["Back"]),
+    el("button", {
+      class: "ghost",
+      onclick: () => {
+        if (retry) retry();
+        else if (back) location.assign(back);
+        else composer({ account, back });
+      },
+    }, [retry ? text("backToSettings") : "Back"]),
   ]);
 }
 
-async function approve({ account, back, make, needsPublicKey }) {
+async function approve({ account, back, make, needsPublicKey, next, note, retry, hint }) {
   const loaded = await loadAccount(account);
   const api = globalThis.XrplAccountLib;
   const idBytes = accountBytes(api, account);
@@ -515,6 +524,7 @@ async function approve({ account, back, make, needsPublicKey }) {
   paint();
   const go = el("button", {}, ["Approve"]);
   screen(made.summary || "Approve", [
+    hint ? el("p", {}, [hint]) : null,
     el("details", { class: "raw" }, [el("summary", {}, ["Transaction details"]), pre]),
     go,
   ]);
@@ -533,6 +543,14 @@ async function approve({ account, back, make, needsPublicKey }) {
     }
     const tx = await submitTx(api, rpc, wallet, { ...prepared, Memos: [assertionParts(assertion)] }, definitions);
     if (tx.result !== "tesSUCCESS") throw new Error(`${tx.result} ${tx.hook}`.trim());
+    if (next) {
+      try {
+        await next();
+      } catch (error) {
+        throw new Error(`${text("firewallRemoved")} ${error.message || error}`);
+      }
+      return;
+    }
     sent(account, back, tx.hash, tx.validated);
   }
 
@@ -551,7 +569,8 @@ async function approve({ account, back, make, needsPublicKey }) {
       }
       await finish();
     } catch (error) {
-      rejected(account, back, error);
+      const detail = error.message || String(error);
+      rejected(account, back, new Error(note && !detail.includes(note) ? `${note} ${detail}` : detail), retry);
     }
   });
 }
@@ -756,31 +775,82 @@ function paintGeneral(body, account) {
   ]));
 }
 
-async function quoteHookFee(account) {
+async function accountLevel(account) {
+  try {
+    const namespace = await rpc("account_namespace", { account, namespace_id: NAMESPACE, ledger_index: "validated" });
+    return hookLevel(namespace);
+  } catch {
+    return 3;
+  }
+}
+
+async function quoteHookFee(account, replace) {
   const api = globalThis.XrplAccountLib;
   const [code, info, definitions] = await Promise.all([
     wasmHex(),
     rpc("account_info", { account, ledger_index: "validated" }),
     networkDefinitions(api, rpc),
   ]);
-  return requiredFee(api, rpc, {
+  const sequence = info.account_data.Sequence;
+  const install = BigInt(await requiredFee(api, rpc, {
     ...setHookTx(code),
     Account: account,
-    Sequence: info.account_data.Sequence,
-  }, definitions);
+    Sequence: sequence,
+  }, definitions));
+  if (!replace || await accountLevel(account) < 3) return install.toString();
+  const remove = BigInt(await requiredFee(api, rpc, {
+    ...clearHookTx(),
+    Account: account,
+    Sequence: sequence,
+  }, definitions));
+  return (install + remove).toString();
 }
 
-async function startHookUpdate(account) {
+async function installFirewall(account, back) {
   const code = await wasmHex();
   const block = await firewallBlock(rpc, code);
   if (block) throw new Error(block);
-  const back = safeReturn(params.get("return") || "", account) || pwaUrl(account);
   await approve({
     account,
     back,
     needsPublicKey: true,
-    make: () => ({ summary: text("updateFirewall"), payment: null, tx: setHookTx(code) }),
+    make: () => ({ summary: text("installFirewall"), payment: null, tx: setHookTx(code) }),
   });
+}
+
+async function startHookUpdate(account) {
+  const back = safeReturn(params.get("return") || "", account) || pwaUrl(account);
+  // A failed read must not fall through into a wasm SetHook. At level 3 that
+  // transaction is larger than the hook can hash, which is the rejection we
+  // are avoiding.
+  const hook = await installedHook(account);
+  // Level 3 hashes the whole transaction and stops at 2048 bytes. The wasm
+  // does not fit, so the passkey first deletes the hook, then installs it.
+  if (hook.hash && await accountLevel(account) >= 3) {
+    const code = await wasmHex();
+    const block = await firewallBlock(rpc, code);
+    if (block) throw new Error(block);
+    const retry = () => settings(account, "version");
+    await approve({
+      account,
+      back,
+      needsPublicKey: true,
+      retry,
+      hint: text("firewallTwoStep"),
+      make: () => ({ summary: text("removeFirewall"), payment: null, tx: clearHookTx() }),
+      next: () => approve({
+        account,
+        back,
+        needsPublicKey: true,
+        note: text("firewallRemoved"),
+        hint: text("firewallRemoved"),
+        retry,
+        make: () => ({ summary: text("installFirewall"), payment: null, tx: setHookTx(code) }),
+      }),
+    });
+    return;
+  }
+  await installFirewall(account, back);
 }
 
 async function paintVersion(body, account) {
@@ -812,16 +882,29 @@ async function paintVersion(body, account) {
     el("p", {}, [text(hookKey)]),
     versionRows(hookRows),
   ];
-  if (hook?.hash && hook.hash !== HOOK_HASH) {
+  const replace = Boolean(hook?.hash && hook.hash !== HOOK_HASH);
+  let restore = false;
+  if (hook && !hook.hash) {
+    try {
+      const namespace = await rpc("account_namespace", { account, namespace_id: NAMESPACE, ledger_index: "validated" });
+      restore = Boolean(stateValue(namespace, "PX"));
+    } catch {
+      restore = false;
+    }
+  }
+  if (gen !== viewGen) return;
+  if (replace || restore) {
+    const label = text(replace ? "updateFirewall" : "installFirewall");
     const button = el("button", { type: "button" }, [text("checkingFee")]);
     button.addEventListener("click", () => {
+      button.disabled = true;
       startHookUpdate(account).catch((error) => rejected(account, back, error));
     });
     hookNodes.push(button);
-    quoteHookFee(account).then((fee) => {
-      if (gen === viewGen) button.textContent = `${text("updateFirewall")} · ${showAmount(fee)} XAH`;
+    quoteHookFee(account, replace).then((fee) => {
+      if (gen === viewGen) button.textContent = `${label} · ${showAmount(fee)} XAH`;
     }).catch(() => {
-      if (gen === viewGen) button.textContent = text("updateFirewall");
+      if (gen === viewGen) button.textContent = label;
     });
   }
   hookCard.replaceChildren(...hookNodes);
