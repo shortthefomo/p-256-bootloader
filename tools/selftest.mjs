@@ -109,6 +109,7 @@ const signerApp = readFileSync(new URL("../src/signer-app.mjs", import.meta.url)
 check("signer json starts collapsed", signerApp.includes('class: "raw"') && signerApp.includes('["Details"]') && signerApp.includes('["Transaction details"]'));
 check("signing does not rename the passkey", !signerApp.includes("signalCurrentUserDetails"));
 check("home follows closed ledgers", signerApp.includes('streams: ["ledger"]') && walletJs.includes('streams: ["ledger"]') && walletJs.includes('body.type === "ledgerClosed"'));
+check("scanner reads one crop a frame", signerApp.includes("imageSmoothingEnabled = false") && signerApp.includes("const SCAN = 320") && signerApp.includes("readSquare(guide, 0)"));
 check("home shows issued balances", signerApp.includes("account_lines") && walletJs.includes("account_lines"));
 const txHash = "ab".repeat(32);
 check("devnet tx link", txUrl(txHash.toUpperCase()) === `${EXPLORER}/tx/${txHash}` && txUrl(txHash, 21337) === "");
@@ -118,7 +119,14 @@ check("a network can list several explorers", explorerUrls(txHash, [
 ]).map((item) => item.url).join(" ") === `https://one.example/tx/${txHash} https://two.example/transactions/${txHash}`);
 check("tx link needs 64 hex", txUrl("abcd") === "");
 check("ledger uses the same explorer", walletJs.includes(`origin: "${EXPLORER}"`) && walletJs.includes('txPath: "/tx/"') && walletJs.includes("function txUrl(") && walletJs.includes("links[0].url"));
-check("activity rows link out", signerApp.includes("explorerLinks(") && signerApp.includes("txUrl("));
+check("activity rows link out", signerApp.includes("explorerLinks(") && signerApp.includes("txUrl(") && signerApp.includes("links[0].url") && !signerApp.includes("links.slice(1)"));
+const signerHtml = readFileSync(new URL("../public/signer.html", import.meta.url), "utf8");
+const walletCss = readFileSync(new URL("../public/wallet.css", import.meta.url), "utf8");
+check("activity rows are not underlined", !signerHtml.includes("text-decoration-color: #8dffc1") && !walletCss.includes("text-decoration-color: #8dffc1") && !signerHtml.includes(".dash") && !signerApp.includes('class: "dash"'));
+check("desktop fills the window", signerHtml.includes("max-width: none") && walletCss.includes("max-width: none") && !signerHtml.includes("52rem") && !walletCss.includes("64rem"));
+check("explorer links open in a new tab", signerApp.includes('target: "_blank"') && signerApp.includes('rel: "noopener"') && walletJs.includes('"_blank"') && walletJs.includes('"noopener"') && !walletJs.includes("links[k]"));
+check("theme defaults to dark", signerHtml.includes('getItem("p256-theme")') && signerHtml.includes('saved === "light" ? "light" : "dark"') && walletJs.includes('getItem("p256-theme")') && walletJs.startsWith("(function () {\n  var theme = \"dark\";") && !signerHtml.includes("prefers-color-scheme") && !walletCss.includes("prefers-color-scheme"));
+check("same-tab wallet links stay on this tab", !walletJs.slice(walletJs.indexOf("function href("), walletJs.indexOf("function showNote(")).includes("_blank"));
 
 let firewall = null;
 try {
@@ -257,7 +265,7 @@ function cropCenter(src, frame, fraction) {
   return out;
 }
 const distant = placeQr(raster.rgba, raster.width, raster.height, 960, 0.22);
-check("qr misses a distant code in the full frame", decodeImage(distant, 960, 960) === "");
+check("qr reads a distant code in the full frame", decodeImage(distant, 960, 960) === signText);
 const centered = cropCenter(distant, 960, 0.4);
 const centerSide = Math.round(960 * 0.4);
 check("qr reads that code from the center", decodeImage(centered, centerSide, centerSide) === signText);

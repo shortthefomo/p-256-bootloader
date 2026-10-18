@@ -738,7 +738,8 @@ function binarize(rgba, width, height) {
       const x1 = Math.min(width - 1, x + radius);
       const area = (y1 - y0 + 1) * (x1 - x0 + 1);
       const sum = integral[y1s + x1 + 1] - integral[y0s + x1 + 1] - integral[y1s + x0] + integral[y0s + x0];
-      bin[grow + x] = gray[grow + x] * area * 4 < sum * 3 ? 1 : 0;
+      // Black when darker than the local average, so a slightly soft code still has solid finders.
+      bin[grow + x] = gray[grow + x] * area < sum ? 1 : 0;
     }
   }
   return bin;

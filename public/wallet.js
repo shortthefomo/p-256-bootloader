@@ -1,3 +1,11 @@
+(function () {
+  var theme = "dark";
+  try {
+    var saved = localStorage.getItem("p256-theme");
+    if (saved === "light" || saved === "dark") theme = saved;
+  } catch (error) {}
+  document.documentElement.dataset.theme = theme;
+})();
 const me = document.currentScript;
 const S = me.dataset.s;
 const acct = location.pathname.split("/").filter(Boolean)[0] || "";
@@ -142,6 +150,8 @@ function sentNote(hash) {
   }
   const link = document.createElement("a");
   link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener";
   link.textContent = shortAddr(hash);
   note.append(link);
 }
@@ -162,9 +172,30 @@ document.documentElement.dataset.shell = phone ? "phone" : "desk";
 
 const balanceLine = $("b").parentElement;
 balanceLine.className = "balance";
-balanceLine.replaceChildren($("b"), document.createTextNode(" XAH"));
+const balanceUnit = document.createElement("span");
+balanceUnit.textContent = " XAH";
+balanceLine.replaceChildren($("b"), balanceUnit);
 const linesBox = document.createElement("div");
 linesBox.className = "lines";
+
+function themeLabel() {
+  return document.documentElement.dataset.theme === "light" ? "Dark" : "Light";
+}
+
+function themeButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "theme";
+  button.textContent = themeLabel();
+  button.onclick = function () {
+    const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+    document.documentElement.dataset.theme = next;
+    const buttons = document.querySelectorAll("button.theme");
+    for (let i = 0; i < buttons.length; i++) buttons[i].textContent = next === "light" ? "Dark" : "Light";
+    try { localStorage.setItem("p256-theme", next); } catch (error) {}
+  };
+  return button;
+}
 
 const frame = document.createElement("div");
 frame.id = "frame";
@@ -173,7 +204,11 @@ side.className = "side";
 const stage = document.createElement("section");
 stage.className = "stage";
 const intro = $("intro") || document.querySelector("p.m:not(#g)");
-side.append.apply(side, [document.querySelector("h1"), intro, $("a").parentElement, balanceLine, linesBox, $("g")].filter(Boolean));
+const head = document.createElement("div");
+head.className = "head";
+head.append(document.querySelector("h1"));
+if (phone) head.append(themeButton());
+side.append.apply(side, [head, intro, $("a").parentElement, balanceLine, linesBox, $("g")].filter(Boolean));
 stage.append.apply(stage, [$("d"), note, raw].filter(Boolean));
 frame.append(side, stage);
 document.querySelector("main").replaceChildren(frame);
@@ -187,6 +222,7 @@ if ((document.querySelector("meta[name=rev]") || {}).content !== "2") {
   update.textContent = "Install update";
   side.append(update);
 }
+if (!phone) side.append(themeButton());
 
 const hash = new URLSearchParams(location.hash.slice(1));
 const txHash = hash.get("tx");
@@ -201,6 +237,14 @@ else if (txHash) {
 
 let activityPanel = null;
 let activityNote = null;
+let activityList = null;
+
+function txDetail(type, line) {
+  const prefix = type + " · ";
+  if (line === type) return "";
+  if (line.indexOf(prefix) === 0) return line.slice(prefix.length);
+  return line;
+}
 
 function paintLines(lines) {
   linesBox.replaceChildren();
@@ -216,37 +260,48 @@ function paintLines(lines) {
 }
 
 function paintActivity(rows) {
-  if (!activityPanel || !activityNote) return;
-  const old = activityPanel.querySelectorAll(".tx");
+  if (!activityPanel || !activityNote || !activityList) return;
+  const old = activityList.querySelectorAll(".tx");
   for (let i = 0; i < old.length; i++) old[i].remove();
   const list = rows || [];
   activityNote.textContent = list.length ? "" : "No transactions yet.";
   for (let i = 0; i < list.length; i++) {
     const entry = list[i];
     const tx = entry.tx_json || entry.tx || {};
-    const links = explorerLinks(entry.hash || tx.hash || "");
-    if (links.length <= 1) {
-      const line = document.createElement(links.length ? "a" : "div");
-      line.className = "tx";
-      if (links.length) line.href = links[0].url;
-      line.textContent = txLine(entry);
-      activityPanel.append(line);
-      continue;
+    const meta = entry.meta || entry.metaData || {};
+    const type = tx.TransactionType || "Transaction";
+    const line = txLine(entry);
+    const hash = entry.hash || tx.hash || "";
+    const result = meta.TransactionResult || "";
+    const ok = result === "" || result === "tesSUCCESS";
+    const links = explorerLinks(hash);
+    const row = document.createElement(links.length ? "a" : "div");
+    row.className = ok ? "tx" : "tx bad";
+    if (links.length) {
+      row.href = links[0].url;
+      row.target = "_blank";
+      row.rel = "noopener";
     }
-    const row = document.createElement("div");
-    row.className = "tx";
-    const primary = document.createElement("a");
-    primary.href = links[0].url;
-    primary.textContent = txLine(entry);
-    row.append(primary);
-    for (let k = 1; k < links.length; k++) {
-      const alt = document.createElement("a");
-      alt.href = links[k].url;
-      alt.textContent = links[k].name;
-      row.append(document.createTextNode(" "));
-      row.append(alt);
+    const typeNode = document.createElement("span");
+    typeNode.className = "tx-type";
+    typeNode.textContent = type;
+    const main = document.createElement("span");
+    main.className = "tx-main";
+    main.textContent = txDetail(type, line);
+    const end = document.createElement("span");
+    end.className = "tx-end";
+    if (!ok) {
+      const flag = document.createElement("span");
+      flag.className = "tx-flag";
+      flag.textContent = "Failed";
+      end.append(flag);
     }
-    activityPanel.append(row);
+    const hashNode = document.createElement("span");
+    hashNode.className = "tx-hash";
+    hashNode.textContent = shortAddr(hash);
+    end.append(hashNode);
+    row.append(typeNode, main, end);
+    activityList.append(row);
   }
 }
 
@@ -396,7 +451,21 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
   activityNote = document.createElement("p");
   activityNote.className = "m";
   activityNote.textContent = "Loading activity…";
-  activityPanel.append(heading("Activity"), activityNote);
+  activityList = document.createElement("div");
+  activityList.className = "tx-list";
+  if (!phone) {
+    const txHead = document.createElement("div");
+    txHead.className = "tx-head";
+    txHead.setAttribute("aria-hidden", "true");
+    const labels = ["Type", "Detail", "Hash"];
+    for (let i = 0; i < labels.length; i++) {
+      const span = document.createElement("span");
+      span.textContent = labels[i];
+      txHead.append(span);
+    }
+    activityList.append(txHead);
+  }
+  activityPanel.append(heading("Activity"), activityNote, activityList);
   rpc("account_tx", { account: acct, limit: 8 }).then(function (page) {
     paintActivity(page.transactions || []);
   }).catch(function () { activityNote.textContent = "Activity is unavailable."; });

@@ -57,6 +57,7 @@ const params = new URLSearchParams(location.search);
 const SEED_KEY = "p256-seed";
 const ACCOUNT_KEY = "p256-account";
 const SHELL_KEY = "p256-shell";
+const THEME_KEY = "p256-theme";
 let viewGen = 0;
 let stopCamera = () => {};
 let stopWatch = () => {};
@@ -94,13 +95,35 @@ function el(tag, attrs = {}, children = []) {
   return node;
 }
 
+function themeLabel() {
+  return document.documentElement.dataset.theme === "light" ? "Dark" : "Light";
+}
+
+function applyThemeLabels() {
+  for (const button of document.querySelectorAll("button.theme")) button.textContent = themeLabel();
+}
+
+function themeButton() {
+  return el("button", {
+    class: "theme",
+    type: "button",
+    onclick: () => {
+      const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem(THEME_KEY, next); } catch { /* the page keeps the chosen theme */ }
+      applyThemeLabels();
+    },
+  }, [themeLabel()]);
+}
+
 function screen(title, nodes, mode = "") {
   stopCamera();
   stopWatch();
   stopWatch = () => {};
   viewGen += 1;
+  const heading = el("h1", {}, [title]);
   app.replaceChildren(
-    el("header", { class: "top" }, [el("h1", {}, [title])]),
+    el("header", { class: "top" }, shell() === "phone" ? [heading, themeButton()] : [heading]),
     el("div", { class: "view" }, nodes.filter(Boolean)),
   );
   if (mode) renderNav(mode);
@@ -269,7 +292,7 @@ async function runSteps(lines, steps) {
       const detail = await step.run();
       const link = detail ? txUrl(detail) : "";
       item.replaceChildren(document.createTextNode(detail ? `${step.label}. ` : `${step.label}.`));
-      if (link) item.append(el("a", { href: link }, [shortAddress(detail)]));
+      if (link) item.append(el("a", { href: link, target: "_blank", rel: "noopener" }, [shortAddress(detail)]));
       else if (detail) item.append(document.createTextNode(detail));
       if (detail) lines.push(detail);
     } catch (error) {
@@ -408,7 +431,7 @@ async function loadAccount(account) {
 function sent(account, back, hash, result) {
   const next = back || pwaUrl(account);
   const url = txUrl(hash);
-  const where = url ? el("a", { href: url }, [shortAddress(hash)]) : shortAddress(hash);
+  const where = url ? el("a", { href: url, target: "_blank", rel: "noopener" }, [shortAddress(hash)]) : shortAddress(hash);
   const backBtn = el("button", { onclick: () => location.assign(`${next}#tx=${hash}`) }, ["Back to wallet"]);
   screen("Result", [
     el("p", {}, ["Sent ", where, "."]),
@@ -585,14 +608,17 @@ function renderNav(active) {
       el("span", {}, [shortAddress(account)]),
     ]),
     ...buttons,
-    el("button", {
-      class: "tab layout",
-      type: "button",
-      onclick: () => {
-        localStorage.setItem(SHELL_KEY, "phone");
-        location.reload();
-      },
-    }, ["Phone layout"]),
+    el("div", { class: "nav-foot" }, [
+      themeButton(),
+      el("button", {
+        class: "layout",
+        type: "button",
+        onclick: () => {
+          localStorage.setItem(SHELL_KEY, "phone");
+          location.reload();
+        },
+      }, ["Phone layout"]),
+    ]),
   );
 }
 
@@ -646,23 +672,44 @@ function addressRow(account) {
   ]);
 }
 
+function txDetail(type, line) {
+  const prefix = `${type} · `;
+  if (line === type) return "";
+  return line.startsWith(prefix) ? line.slice(prefix.length) : line;
+}
+
 function txRow(row) {
+  const type = row.type || "Transaction";
   const links = explorerLinks(row.hash);
-  const status = el("span", { class: row.ok ? "muted" : "warn" }, [row.ok ? shortAddress(row.hash) : "Failed"]);
-  if (links.length <= 1) {
-    const body = [el("b", {}, [row.line]), status];
-    return links.length ? el("a", { class: "tx", href: links[0].url }, body) : el("div", { class: "tx" }, body);
+  const ok = Boolean(row.ok);
+  const attrs = { class: ok ? "tx" : "tx bad" };
+  if (links[0]) {
+    attrs.href = links[0].url;
+    attrs.target = "_blank";
+    attrs.rel = "noopener";
   }
-  return el("div", { class: "tx" }, [
-    el("a", { href: links[0].url }, [el("b", {}, [row.line])]),
-    status,
-    ...links.slice(1).map((link) => el("a", { href: link.url }, [link.name])),
-  ]);
+  const detail = txDetail(type, row.line || "");
+  const end = [];
+  if (!ok) end.push(el("span", { class: "tx-flag" }, ["Failed"]));
+  end.push(el("span", { class: "tx-hash" }, [shortAddress(row.hash)]));
+  const body = [
+    el("span", { class: "tx-type" }, [type]),
+    el("span", { class: "tx-main" }, detail ? [detail] : []),
+    el("span", { class: "tx-end" }, end),
+  ];
+  return links[0] ? el("a", attrs, body) : el("div", attrs, body);
 }
 
 function txList(rows) {
   if (!rows.length) return el("p", { class: "muted" }, ["No transactions yet."]);
-  return el("div", {}, rows.map(txRow));
+  const head = shell() === "desk"
+    ? el("div", { class: "tx-head", "aria-hidden": "true" }, [
+      el("span", {}, ["Type"]),
+      el("span", {}, ["Detail"]),
+      el("span", {}, ["Hash"]),
+    ])
+    : null;
+  return el("div", { class: "tx-list" }, [head, ...rows.map(txRow)]);
 }
 
 function holdsBalance(line) {
@@ -787,10 +834,10 @@ async function walletHome(account) {
     ];
     if (shell() === "desk") {
       screen("Wallet", [
-        el("div", { class: "hero" }, hero.filter(Boolean)),
-        el("div", { class: "dash" }, [
-          el("section", { class: "card" }, [el("h2", {}, ["Activity"]), feed]),
-          el("section", { class: "card" }, [el("h2", {}, ["Receive"]), ...receiveParts(account)]),
+        el("div", { class: "board" }, [
+          el("div", { class: "hero" }, hero.filter(Boolean)),
+          el("section", { class: "card activity" }, [el("h2", {}, ["Activity"]), feed]),
+          el("section", { class: "card receive" }, [el("h2", {}, ["Receive"]), ...receiveParts(account)]),
         ]),
       ], "home");
     } else {
@@ -1065,10 +1112,17 @@ function scan(account) {
   video.playsInline = true;
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  // One fixed readback. Resizing the canvas every frame makes Safari allocate
+  // a new buffer, and a smoothed scale washes the finder out.
+  const SCAN = 320;
+  canvas.width = SCAN;
+  canvas.height = SCAN;
+  ctx.imageSmoothingEnabled = false;
   let stopped = false;
   let locked = false;
   let frameHandle = 0;
   let step = 0;
+  let lastScan = 0;
   let detecting = false;
   stopCamera = () => {
     stopped = true;
@@ -1118,15 +1172,15 @@ function scan(account) {
     const side = Math.min(rect.w, rect.h) * frac;
     return clamp(rect.x + (rect.w - side) / 2, rect.y + (rect.h - side) / 2, side, side, video.videoWidth, video.videoHeight);
   };
-  const readRect = (rect, turn, maxEdge) => {
-    const scale = Math.min(1, maxEdge / Math.max(rect.w, rect.h));
-    const w = Math.max(21, Math.round(rect.w * scale));
-    const h = Math.max(21, Math.round(rect.h * scale));
-    if (canvas.width !== w) canvas.width = w;
-    if (canvas.height !== h) canvas.height = h;
-    ctx.drawImage(video, rect.x, rect.y, rect.w, rect.h, 0, 0, w, h);
-    const frame = ctx.getImageData(0, 0, w, h);
-    return decodeImage(frame.data, w, h, turn);
+  const readSquare = (rect, turn) => {
+    if (!rect) return "";
+    const side = Math.min(rect.w, rect.h);
+    if (side < 21) return "";
+    const x = rect.x + (rect.w - side) / 2;
+    const y = rect.y + (rect.h - side) / 2;
+    ctx.drawImage(video, x, y, side, side, 0, 0, SCAN, SCAN);
+    const frame = ctx.getImageData(0, 0, SCAN, SCAN);
+    return decodeImage(frame.data, SCAN, SCAN, turn);
   };
   const take = (text) => {
     if (!text || locked || stopped || gen !== viewGen) return;
@@ -1139,7 +1193,7 @@ function scan(account) {
     if (video.requestVideoFrameCallback) frameHandle = video.requestVideoFrameCallback(tick);
     else frameHandle = requestAnimationFrame(tick);
   };
-  const tick = () => {
+  const tick = (now) => {
     if (stopped || locked || gen !== viewGen) return;
     try {
       if (detector && !detecting && video.readyState >= 2) {
@@ -1152,25 +1206,19 @@ function scan(account) {
           detector = null;
         });
       }
-      if (video.readyState >= 2) {
-        // Scaling the whole guide throws away the pixels of a code that does
-        // not fill it. Read the center at the sensor's own size first. The
-        // two sizes cover a code inside the guide and a smaller one; the
-        // guide itself catches a code that fills it. At most two reads.
-        const seen = mappedRect(video.getBoundingClientRect(), 0);
-        const zoom = seen && centerSquare(seen, (step & 1) === 0 ? 0.46 : 0.28);
-        let text = zoom ? readRect(zoom, 0, 440) : "";
-        if (!text && zoom && step % 8 === 7) {
-          text = readRect(zoom, step % 16 === 7 ? 20 : -20, 360);
-        } else if (!text) {
-          const wide = mappedRect(reticle.getBoundingClientRect(), 0.12);
-          const zoomLong = zoom ? Math.max(zoom.w, zoom.h) : 0;
-          const wideLong = wide ? Math.max(wide.w, wide.h) : 0;
-          if (wide && !(zoomLong && Math.abs(zoomLong - wideLong) / Math.max(zoomLong, wideLong) < 0.15)) {
-            text = readRect(wide, 0, 380);
-          }
-        }
+      const stamp = now || performance.now();
+      // One crop from the square, about 30 times a second.
+      if (video.readyState >= 2 && stamp - lastScan >= 32) {
+        lastScan = stamp;
+        const guide = mappedRect(reticle.getBoundingClientRect(), 0.18);
+        const n = step;
         step += 1;
+        let text = "";
+        if (guide) {
+          if (n % 16 === 15) text = readSquare(guide, n % 32 === 15 ? 20 : -20);
+          else if (n % 4 === 3) text = readSquare(centerSquare(guide, 0.5), 0);
+          else text = readSquare(guide, 0);
+        }
         if (text) {
           take(text);
           return;
