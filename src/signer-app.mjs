@@ -15,19 +15,22 @@ import {
   asciiHex,
   bytesToHex,
   derToRaw,
-  dropsToXah,
   hexToBytes,
   memoFromWebAuthn,
   openSeed,
   prfSalt,
+  readMeta,
   sealSeed,
   utf8,
   xahToDrops,
   xyFromAuthenticatorData,
   xyFromSpki,
 } from "./protocol.mjs";
+import { AMOUNT_FORMATS, LANGUAGES, canonicalAmount, formatDrops, translate } from "./locale.mjs";
 import {
   FAUCET,
+  HOOK_HASH,
+  INTERFACE_REV,
   NAMESPACE,
   accountBytes,
   accountSetLoaderTx,
@@ -58,6 +61,8 @@ const SEED_KEY = "p256-seed";
 const ACCOUNT_KEY = "p256-account";
 const SHELL_KEY = "p256-shell";
 const THEME_KEY = "p256-theme";
+const LANG_KEY = "p256-lang";
+const FORMAT_KEY = "p256-format";
 let viewGen = 0;
 let stopCamera = () => {};
 let stopWatch = () => {};
@@ -95,8 +100,43 @@ function el(tag, attrs = {}, children = []) {
   return node;
 }
 
+function preference(key, allowed, fallback) {
+  try {
+    const value = localStorage.getItem(key);
+    if (allowed.includes(value)) return value;
+  } catch {
+    // This page keeps the default.
+  }
+  return fallback;
+}
+
+function language() {
+  return preference(LANG_KEY, LANGUAGES.map((item) => item.id), "en");
+}
+
+function amountFormat() {
+  return preference(FORMAT_KEY, AMOUNT_FORMATS.map((item) => item.id), "plain");
+}
+
+function text(key, vars) {
+  return translate(language(), key, vars);
+}
+
+function showAmount(drops) {
+  return formatDrops(drops, amountFormat());
+}
+
+function displayAmount(plain) {
+  if (!plain) return "";
+  try {
+    return formatDrops(xahToDrops(plain), amountFormat());
+  } catch {
+    return plain;
+  }
+}
+
 function themeLabel() {
-  return document.documentElement.dataset.theme === "light" ? "Dark" : "Light";
+  return document.documentElement.dataset.theme === "light" ? text("dark") : text("light");
 }
 
 function applyThemeLabels() {
@@ -152,24 +192,19 @@ async function pageIsStale(account) {
 function updateBanner(account) {
   const back = safeReturn(params.get("return") || "", account) || pwaUrl(account);
   return el("div", { class: "banner" }, [
-    el("p", {}, ["A new wallet page is ready for this account."]),
+    el("p", {}, [text("interfaceDiffers")]),
     el("button", {
       type: "button",
       onclick: () => republish(account, back).catch((error) => rejected(account, back, error)),
-    }, ["Install"]),
+    }, [text("updateWallet")]),
   ]);
 }
 
-function layoutSwitch() {
-  if (shell() !== "phone") return null;
-  return el("button", {
-    class: "link",
-    type: "button",
-    onclick: () => {
-      localStorage.setItem(SHELL_KEY, "desk");
-      location.reload();
-    },
-  }, ["Use the computer layout"]);
+function chooseShell(value) {
+  if (value !== "phone" && value !== "desk") return;
+  if (value === shell()) return;
+  try { localStorage.setItem(SHELL_KEY, value); } catch { /* the next load keeps the automatic layout */ }
+  location.reload();
 }
 
 function say(parent, text, className = "muted") {
@@ -593,13 +628,17 @@ function renderNav(active) {
   nav.hidden = false;
   const phone = shell() === "phone";
   const items = phone
-    ? [["home", "Home"], ["send", "Send"], ["scan", "Scan"], ["receive", "Receive"]]
-    : [["home", "Home"], ["send", "Send"], ["receive", "Receive"], ["activity", "Activity"], ["scan", "Scan"]];
-  const buttons = items.map(([id, label]) => el("button", {
-    class: id === active ? "tab on" : "tab",
-    type: "button",
-    onclick: () => route(id, account),
-  }, [label]));
+    ? ["home", "send", "scan", "receive", "settings"]
+    : ["home", "send", "receive", "activity", "scan", "settings"];
+  const buttons = items.map((id) => {
+    const label = text(id);
+    return el("button", {
+      class: id === active ? "tab on" : "tab",
+      type: "button",
+      title: label,
+      onclick: () => route(id, account),
+    }, [label]);
+  });
   if (phone) {
     nav.replaceChildren(...buttons);
     return;
@@ -610,18 +649,199 @@ function renderNav(active) {
       el("span", {}, [shortAddress(account)]),
     ]),
     ...buttons,
-    el("div", { class: "nav-foot" }, [
-      themeButton(),
-      el("button", {
-        class: "layout",
-        type: "button",
-        onclick: () => {
-          localStorage.setItem(SHELL_KEY, "phone");
-          location.reload();
-        },
-      }, ["Phone layout"]),
-    ]),
+    el("div", { class: "nav-foot" }, [themeButton()]),
   );
+}
+
+function versionRows(pairs) {
+  return el("div", { class: "kv" }, pairs.flatMap(([label, value]) => [
+    el("span", {}, [label]),
+    el("span", { class: "mono" }, [value || "—"]),
+  ]));
+}
+
+async function installedHook(account) {
+  const page = await rpc("account_objects", { account, type: "hook", ledger_index: "validated" });
+  let hash = "";
+  for (const object of page.account_objects || []) {
+    for (const item of object.Hooks || []) {
+      const found = item?.Hook?.HookHash;
+      if (found) {
+        hash = String(found).toUpperCase();
+        break;
+      }
+    }
+    if (hash) break;
+  }
+  if (!hash) return { hash: "", fee: "" };
+  try {
+    const entry = await rpc("ledger_entry", { hook_definition: hash, ledger_index: "validated" });
+    const node = entry.node || entry;
+    return { hash, fee: node.Fee != null ? String(node.Fee) : "" };
+  } catch {
+    return { hash, fee: "" };
+  }
+}
+
+async function pageStatus(account) {
+  try {
+    const entry = await rpc("ledger_entry", { app_loader: account, ledger_index: "validated" });
+    const published = loaderHtmlFromEntry(entry);
+    const meta = vaultFromHtml(published);
+    return {
+      published: true,
+      rev: readMeta(published, "rev"),
+      stale: loaderChanged(published, {
+        signer: `${location.origin}${location.pathname}`,
+        vault: meta.vault,
+        cid: meta.cid,
+        spk: meta.spk,
+      }),
+    };
+  } catch {
+    return { published: false, rev: "", stale: false };
+  }
+}
+
+function rememberPreference(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // The choice lasts until this page is replaced.
+  }
+}
+
+function choice(label, value, options, onChange) {
+  const select = el("select");
+  for (const option of options) select.append(el("option", { value: option.id }, [option.name]));
+  select.value = value;
+  select.addEventListener("change", () => onChange(select.value));
+  return el("label", { class: "setting" }, [el("span", {}, [label]), select]);
+}
+
+function settings(account, section = "version") {
+  rememberAccount(account);
+  const seg = (id) => el("button", {
+    class: id === section ? "tab on" : "tab",
+    type: "button",
+    onclick: () => settings(account, id),
+  }, [text(id)]);
+  const body = el("div", { class: "settings" });
+  screen(text("settings"), [
+    el("div", { class: "seg" }, [seg("version"), seg("general")]),
+    body,
+  ], "settings");
+  if (section === "general") paintGeneral(body, account);
+  else paintVersion(body, account);
+}
+
+function paintGeneral(body, account) {
+  body.replaceChildren(el("section", { class: "card" }, [
+    choice(text("language"), language(), LANGUAGES, (value) => {
+      rememberPreference(LANG_KEY, value);
+      settings(account, "general");
+    }),
+    choice(text("currencyFormat"), amountFormat(), AMOUNT_FORMATS.map((item) => ({ id: item.id, name: item.example })), (value) => {
+      rememberPreference(FORMAT_KEY, value);
+      settings(account, "general");
+    }),
+    el("p", { class: "muted" }, [text("formatHint")]),
+    el("label", { class: "setting" }, [
+      el("span", {}, [text("layout")]),
+      el("div", { class: "seg" }, [
+        el("button", { class: shell() === "phone" ? "tab on" : "tab", type: "button", onclick: () => chooseShell("phone") }, [text("mobile")]),
+        el("button", { class: shell() === "desk" ? "tab on" : "tab", type: "button", onclick: () => chooseShell("desk") }, [text("desktop")]),
+      ]),
+    ]),
+  ]));
+}
+
+async function quoteHookFee(account) {
+  const api = globalThis.XrplAccountLib;
+  const [code, info, definitions] = await Promise.all([
+    wasmHex(),
+    rpc("account_info", { account, ledger_index: "validated" }),
+    networkDefinitions(api, rpc),
+  ]);
+  return requiredFee(api, rpc, {
+    ...setHookTx(code),
+    Account: account,
+    Sequence: info.account_data.Sequence,
+  }, definitions);
+}
+
+async function startHookUpdate(account) {
+  const code = await wasmHex();
+  const block = await firewallBlock(rpc, code);
+  if (block) throw new Error(block);
+  const back = safeReturn(params.get("return") || "", account) || pwaUrl(account);
+  await approve({
+    account,
+    back,
+    needsPublicKey: true,
+    make: () => ({ summary: text("updateFirewall"), payment: null, tx: setHookTx(code) }),
+  });
+}
+
+async function paintVersion(body, account) {
+  const hookCard = el("section", { class: "card" }, [
+    el("h2", {}, [text("firewall")]),
+    el("p", { class: "muted" }, [text("loading")]),
+  ]);
+  const pageCard = el("section", { class: "card" }, [
+    el("h2", {}, [text("walletInterface")]),
+    el("p", { class: "muted" }, [text("loading")]),
+  ]);
+  body.replaceChildren(hookCard, pageCard);
+  const gen = viewGen;
+  const back = safeReturn(params.get("return") || "", account) || pwaUrl(account);
+  const [hook, page] = await Promise.all([
+    installedHook(account).catch(() => null),
+    pageStatus(account),
+  ]);
+  if (gen !== viewGen) return;
+  const hookKey = !hook ? "hookUnreadable" : !hook.hash ? "hookMissing" : hook.hash === HOOK_HASH ? "hookMatches" : "hookDiffers";
+  const hookRows = [
+    [text("installed"), hook?.hash || "—"],
+    [text("shipped"), HOOK_HASH],
+  ];
+  if (hook?.fee) hookRows.push([text("executionFee"), `${showAmount(hook.fee)} XAH · ${hook.fee} ${text("drops")}`]);
+  const hookNodes = [
+    el("h2", {}, [text("firewall")]),
+    el("p", { class: hookKey === "hookDiffers" ? "warn" : "muted" }, [text(hookKey === "hookDiffers" ? "updateAvailable" : hookKey === "hookMatches" ? "current" : hookKey === "hookMissing" ? "notInstalled" : "hookUnreadable")]),
+    el("p", {}, [text(hookKey)]),
+    versionRows(hookRows),
+  ];
+  if (hook?.hash && hook.hash !== HOOK_HASH) {
+    const button = el("button", { type: "button" }, [text("checkingFee")]);
+    button.addEventListener("click", () => {
+      startHookUpdate(account).catch((error) => rejected(account, back, error));
+    });
+    hookNodes.push(button);
+    quoteHookFee(account).then((fee) => {
+      if (gen === viewGen) button.textContent = `${text("updateFirewall")} · ${showAmount(fee)} XAH`;
+    }).catch(() => {
+      if (gen === viewGen) button.textContent = text("updateFirewall");
+    });
+  }
+  hookCard.replaceChildren(...hookNodes);
+  const pageKey = !page.published ? "interfaceMissing" : page.stale ? "interfaceDiffers" : "interfaceMatches";
+  const pageNodes = [
+    el("h2", {}, [text("walletInterface")]),
+    el("p", { class: page.stale ? "warn" : "muted" }, [text(page.stale ? "updateAvailable" : page.published ? "current" : "notPublished")]),
+    el("p", {}, [text(pageKey)]),
+    versionRows([
+      [text("shipped"), INTERFACE_REV],
+      [text("installed"), page.published ? (page.rev || "—") : "—"],
+    ]),
+  ];
+  if (page.stale) {
+    pageNodes.push(el("button", {
+      type: "button",
+      onclick: () => republish(account, back).catch((error) => rejected(account, back, error)),
+    }, [text("updateWallet")]));
+  }
+  pageCard.replaceChildren(...pageNodes);
 }
 
 function route(id, account) {
@@ -629,6 +849,7 @@ function route(id, account) {
   else if (id === "send") sendForm(account);
   else if (id === "scan") scan(account);
   else if (id === "receive") receive(account);
+  else if (id === "settings") settings(account);
   else activity(account);
 }
 
@@ -703,12 +924,12 @@ function txRow(row) {
 }
 
 function txList(rows) {
-  if (!rows.length) return el("p", { class: "muted" }, ["No transactions yet."]);
+  if (!rows.length) return el("p", { class: "muted" }, [text("emptyActivity")]);
   const head = shell() === "desk"
     ? el("div", { class: "tx-head", "aria-hidden": "true" }, [
-      el("span", {}, ["Type"]),
-      el("span", {}, ["Detail"]),
-      el("span", {}, ["Hash"]),
+      el("span", {}, [text("type")]),
+      el("span", {}, [text("detail")]),
+      el("span", {}, [text("hash")]),
     ])
     : null;
   return el("div", { class: "tx-list" }, [head, ...rows.map(txRow)]);
@@ -757,7 +978,7 @@ function followLedgers(account, gen, paint) {
       issuedLines(account),
     ]).then(([info, rows, lines]) => {
       if (gen !== viewGen) return;
-      paint(dropsToXah(info.account_data.Balance), rows, lines);
+      paint(showAmount(info.account_data.Balance), rows, lines);
     }).catch(() => {}).finally(() => {
       busy = false;
       if (again && gen === viewGen) {
@@ -796,7 +1017,7 @@ function askAccount(done) {
 
 async function walletHome(account) {
   rememberAccount(account);
-  screen("Wallet", [el("p", { class: "muted" }, ["Loading the account…"])], "home");
+  screen(text("wallet"), [el("p", { class: "muted" }, [text("loadingAccount")])], "home");
   const gen = viewGen;
   try {
     const [info, rows, lines] = await Promise.all([
@@ -807,7 +1028,7 @@ async function walletHome(account) {
     if (gen !== viewGen) return;
     const stale = await pageIsStale(account);
     if (gen !== viewGen) return;
-    const amount = document.createTextNode(dropsToXah(info.account_data.Balance));
+    const amount = document.createTextNode(showAmount(info.account_data.Balance));
     const linesBox = el("ul", { class: "lines" });
     const feed = el("div", { class: "feed" });
     let shownRows = null;
@@ -835,25 +1056,24 @@ async function walletHome(account) {
       stale ? updateBanner(account) : null,
     ];
     if (shell() === "desk") {
-      screen("Wallet", [
+      screen(text("wallet"), [
         el("div", { class: "board" }, [
           el("div", { class: "hero" }, hero.filter(Boolean)),
-          el("section", { class: "card activity" }, [el("h2", {}, ["Activity"]), feed]),
-          el("section", { class: "card receive" }, [el("h2", {}, ["Receive"]), ...receiveParts(account)]),
+          el("section", { class: "card activity" }, [el("h2", {}, [text("activity")]), feed]),
+          el("section", { class: "card receive" }, [el("h2", {}, [text("receive")]), ...receiveParts(account)]),
         ]),
       ], "home");
     } else {
-      screen("Wallet", [
+      screen(text("wallet"), [
         ...hero,
-        el("h2", {}, ["Activity"]),
+        el("h2", {}, [text("activity")]),
         feed,
-        layoutSwitch(),
       ], "home");
     }
     followLedgers(account, viewGen, paint);
   } catch (error) {
     if (gen !== viewGen) return;
-    screen("Wallet", [
+    screen(text("wallet"), [
       el("p", {}, [error.message || String(error)]),
       el("button", { class: "ghost", type: "button", onclick: () => home() }, ["Use a different account"]),
     ], "home");
@@ -864,7 +1084,7 @@ function sendForm(account, dest = "", amount = "") {
   rememberAccount(account);
   const destination = el("input", {
     type: "text",
-    placeholder: "Destination r…",
+    placeholder: text("destPlaceholder"),
     autocomplete: "off",
     spellcheck: "false",
     value: dest,
@@ -872,26 +1092,34 @@ function sendForm(account, dest = "", amount = "") {
   const xah = el("input", {
     type: "text",
     inputMode: "decimal",
-    placeholder: "Amount XAH",
+    placeholder: text("amountPlaceholder"),
     autocomplete: "off",
-    value: amount,
+    value: displayAmount(amount),
   });
   const note = el("p", { class: "muted" }, [""]);
-  const go = el("button", { type: "button" }, [shell() === "desk" ? "Show QR for iPhone" : "Review"]);
+  const go = el("button", { type: "button" }, [shell() === "desk" ? text("showQr") : text("review")]);
   const back = safeReturn(params.get("return") || "", account);
   const body = [
     destination,
     xah,
     note,
     go,
-    el("button", { class: "link", type: "button", onclick: () => composer({ account, back }) }, ["Trust lines, escrow, and other types"]),
+    el("button", { class: "link", type: "button", onclick: () => composer({ account, back }) }, [text("otherTx")]),
   ];
-  screen("Send", shell() === "desk" ? [el("div", { class: "card form" }, body)] : body, "send");
+  screen(text("send"), shell() === "desk" ? [el("div", { class: "card form" }, body)] : body, "send");
   rpc("account_info", { account, ledger_index: "validated" }).then((info) => {
-    note.textContent = `Available ${dropsToXah(info.account_data.Balance)} XAH`;
+    note.textContent = text("available", { amount: showAmount(info.account_data.Balance) });
   }).catch(() => {});
   go.addEventListener("click", () => {
-    pay({ account, dest: destination.value.trim(), xah: xah.value.trim(), back }).catch((error) => rejected(account, back, error));
+    let typed = "";
+    try {
+      typed = canonicalAmount(xah.value.trim(), amountFormat());
+      if (!typed) throw new Error(text("amountInvalid"));
+    } catch (error) {
+      rejected(account, back, error.message === "enter an amount with at most 6 decimals" || error.message === "amount must be greater than 0" ? new Error(text("amountInvalid")) : error);
+      return;
+    }
+    pay({ account, dest: destination.value.trim(), xah: typed, back }).catch((error) => rejected(account, back, error));
   });
 }
 
@@ -899,15 +1127,20 @@ function receiveParts(account) {
   const amount = el("input", {
     type: "text",
     inputMode: "decimal",
-    placeholder: "Request amount, optional",
+    placeholder: text("requestAmount"),
     autocomplete: "off",
   });
   const box = el("div", { class: "qrbox" });
   const paint = () => {
-    const xah = amount.value.trim();
-    const text = xah ? payLink({ page: location.href, dest: account, xah }) : account;
+    let xah = "";
     try {
-      box.replaceChildren(qrCanvas(text));
+      xah = canonicalAmount(amount.value.trim(), amountFormat());
+    } catch {
+      xah = "";
+    }
+    const code = xah ? payLink({ page: location.href, dest: account, xah }) : account;
+    try {
+      box.replaceChildren(qrCanvas(code));
     } catch (error) {
       box.replaceChildren(el("p", { class: "warn" }, [error.message]));
     }
@@ -917,7 +1150,7 @@ function receiveParts(account) {
   return [
     box,
     el("div", { class: "receive-meta" }, [
-      el("p", { class: "muted" }, ["Leave the amount empty and the code is your address."]),
+      el("p", { class: "muted" }, [text("receiveHint")]),
       addressRow(account),
       amount,
     ]),
@@ -927,22 +1160,22 @@ function receiveParts(account) {
 function receive(account) {
   rememberAccount(account);
   const parts = receiveParts(account);
-  screen("Receive", [
+  screen(text("receive"), [
     shell() === "desk" ? el("div", { class: "split card" }, parts) : el("div", {}, parts),
   ], "receive");
 }
 
 async function activity(account) {
   rememberAccount(account);
-  screen("Activity", [el("p", { class: "muted" }, ["Loading…"])], "activity");
+  screen(text("activity"), [el("p", { class: "muted" }, [text("loading")])], "activity");
   const gen = viewGen;
   try {
     const rows = await recent(account, 15);
     if (gen !== viewGen) return;
-    screen("Activity", [txList(rows)], "activity");
+    screen(text("activity"), [txList(rows)], "activity");
   } catch (error) {
     if (gen !== viewGen) return;
-    screen("Activity", [el("p", {}, [error.message || String(error)])], "activity");
+    screen(text("activity"), [el("p", {}, [error.message || String(error)])], "activity");
   }
 }
 
@@ -1100,11 +1333,11 @@ function scan(account) {
   video.setAttribute("playsinline", "");
   const reticle = el("div", { class: "reticle" });
   const finder = el("div", { class: "finder" }, [video, reticle]);
-  const note = el("p", { class: "muted" }, ["Hold the code in the frame. Tap the picture if it stays blurry."]);
-  const pasted = el("input", { type: "text", placeholder: "Or paste a link or address", autocomplete: "off", spellcheck: "false" });
-  const open = el("button", { class: "ghost", type: "button" }, ["Open"]);
+  const note = el("p", { class: "muted" }, [text("scanHint")]);
+  const pasted = el("input", { type: "text", placeholder: text("pastePlaceholder"), autocomplete: "off", spellcheck: "false" });
+  const open = el("button", { class: "ghost", type: "button" }, [text("open")]);
   const paste = el("div", { class: "paste" }, [pasted, open]);
-  screen("Scan", shell() === "desk"
+  screen(text("scan"), shell() === "desk"
     ? [el("div", { class: "split scan-split" }, [finder, el("div", {}, [note, paste])])]
     : [finder, note, paste], "scan");
   const gen = viewGen;
@@ -1299,7 +1532,7 @@ async function pay({ account, dest, xah, back }) {
     Sequence: info.account_data.Sequence,
   }, definitions));
   if (balance < drops + fee) {
-    throw new Error(`balance is ${dropsToXah(balance)} XAH. This send needs ${dropsToXah(drops + fee)} including the fee.`);
+    throw new Error(`balance is ${showAmount(balance)} XAH. This send needs ${showAmount(drops + fee)} including the fee.`);
   }
   if (shell() === "desk") {
     handoff({
@@ -1401,7 +1634,7 @@ async function main() {
     return;
   }
   const op = params.get("op");
-  if (!globalThis.PublicKeyCredential && shell() === "phone" && op !== "scan" && op !== "receive") {
+  if (!globalThis.PublicKeyCredential && shell() === "phone" && op !== "scan" && op !== "receive" && op !== "settings" && op !== "update") {
     screen("No passkeys here", [el("p", {}, ["This browser has no WebAuthn. Open the wallet in Safari on the iPhone."])]);
     return;
   }
@@ -1459,6 +1692,16 @@ async function main() {
         return;
       }
       composer({ account, back });
+      return;
+    }
+    if (op === "settings" || op === "update") {
+      const account = params.get("account") || savedAccount();
+      if (!isAddress(account)) {
+        home();
+        return;
+      }
+      rememberAccount(account);
+      settings(account, "version");
       return;
     }
     if (op === "attach") {

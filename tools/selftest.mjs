@@ -25,7 +25,9 @@ import {
 } from "../src/protocol.mjs";
 import { decodeImage, decodeQr, encodeQr, rasterQr } from "../src/qr.mjs";
 import { describeTx, kindFromTx, parseScan, payLink, requestLink, samePayment, shortAddress } from "../src/scan.mjs";
-import { EXPLORER, HOOK_ON, NAMESPACE, accountBytes, explorerUrls, safeReturn, stateValue, txUrl } from "../src/wallet.mjs";
+import { AMOUNT_FORMATS, LANGUAGES, canonicalAmount, formatDrops, translate } from "../src/locale.mjs";
+import { EXPLORER, HOOK_HASH, HOOK_ON, INTERFACE_REV, NAMESPACE, accountBytes, explorerUrls, safeReturn, stateValue, txUrl } from "../src/wallet.mjs";
+import { createHash } from "node:crypto";
 import { generate, libraries } from "xrpl-accountlib";
 
 let failed = 0;
@@ -103,11 +105,17 @@ check("a current loader is not an update", !loaderChanged(html, loaderFields));
 check("a changed loader is an update", loaderChanged(html.replace("Wallet", "Purse"), loaderFields));
 check("a missing loader is not an update", !loaderChanged("", loaderFields));
 const walletJs = readFileSync(new URL("../public/wallet.js", import.meta.url), "utf8");
+const signerApp = readFileSync(new URL("../src/signer-app.mjs", import.meta.url), "utf8");
 check("wallet script names the namespace", walletJs.includes(NAMESPACE));
 check("wallet leaves the ledger through a link", walletJs.includes("function href(") && !walletJs.includes("location.assign"));
-check("update is offered only for an old page", html.includes('<meta name="rev" content="2">') && walletJs.includes('content !== "2"'));
+check("update is offered only for an old page", html.includes('<meta name="rev" content="2">') && INTERFACE_REV === "2" && walletJs.includes('var INTERFACE_REV = "2"') && walletJs.includes("publishedRev !== INTERFACE_REV"));
+check("settings compares the firewall and the page", signerApp.includes('function settings(account, section = "version")') && signerApp.includes("HOOK_HASH") && walletJs.includes('panel("settings")') && walletJs.includes("p256-lang") && walletJs.includes("p256-format"));
+check("amount formats group the same drops", formatDrops(1234500000n, "plain") === "1234.5" && formatDrops(1234500000n, "comma-dot") === "1,234.5" && formatDrops(1234500000n, "dot-comma") === "1.234,5" && formatDrops(1234500000n, "space-dot") === "1 234.5" && formatDrops(2000000n, "dot-comma") === "2");
+check("typed amounts become the plain form", canonicalAmount("1,234.5", "comma-dot") === "1234.5" && canonicalAmount("1.234,5", "dot-comma") === "1234.5" && canonicalAmount("1 234.5", "space-dot") === "1234.5" && canonicalAmount("1.5", "plain") === "1.5");
+check("an unknown language uses English", translate("zz", "settings") === "Settings" && LANGUAGES.some((item) => item.id === "en") && AMOUNT_FORMATS.some((item) => item.id === "plain"));
+check("chinese japanese and korean are listed", ["zh", "ja", "ko"].every((id) => LANGUAGES.some((item) => item.id === id)) && translate("zh", "settings") === "设置" && translate("ja", "settings") === "設定" && translate("ko", "settings") === "설정" && walletJs.includes('"ko"') && walletJs.includes("한국어") && walletJs.includes("中文") && walletJs.includes("日本語"));
+check("layout choice sits in general", signerApp.includes('text("layout")') && signerApp.includes('chooseShell("desk")') && !signerApp.includes("function layoutSwitch") && walletJs.includes('shellButton("phone", "mobile")') && walletJs.includes('shellButton("desk", "desktop")') && translate("en", "mobile") === "Mobile" && translate("en", "desktop") === "Desktop");
 check("ledger json starts collapsed", walletJs.includes('createElement("details")') && walletJs.includes("raw.open = false"));
-const signerApp = readFileSync(new URL("../src/signer-app.mjs", import.meta.url), "utf8");
 check("signer json starts collapsed", signerApp.includes('class: "raw"') && signerApp.includes('["Details"]') && signerApp.includes('["Transaction details"]'));
 check("signing does not rename the passkey", !signerApp.includes("signalCurrentUserDetails"));
 const walletSrc = readFileSync(new URL("../src/wallet.mjs", import.meta.url), "utf8");
@@ -164,6 +172,7 @@ if (firewall) {
 
 const wasm = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "passkey_p256_firewall_v2.wasm"));
 check("wasm is the firewall module", wasm[0] === 0 && wasm[1] === 0x61 && wasm.length > 1000, `${wasm.length} bytes`);
+check("hook hash is the sha512 half of the wasm", HOOK_HASH === createHash("sha512").update(wasm).digest("hex").slice(0, 64).toUpperCase() && walletJs.includes(HOOK_HASH));
 
 const account = "rP2UiVK5uHJqSkKv1D7koyrCjHNXtCopJW";
 check("return allows the served pwa host", safeReturn(`https://pwa8.pwa.passkey.xahau-dev.net/${account}`, account) === `https://pwa8.pwa.passkey.xahau-dev.net/${account}`);

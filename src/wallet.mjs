@@ -53,6 +53,12 @@ export const NAMESPACE = "70323536626F6F7400000000000000000000000000000000000000
 // Bit 22 (SetHook) is the one active-high bit, so the hook sees SetHook.
 export const HOOK_ON = "00000000000000000000000000000000000001F1000000000000000000400000";
 export const WASM_PATH = "/passkey_p256_firewall_v2.wasm";
+// The on-ledger page carries this rev. public/wallet.js offers an install
+// when the published page has a different one. Bump both with the loader.
+export const INTERFACE_REV = "2";
+// SHA-512 of public/passkey_p256_firewall_v2.wasm, first 32 bytes. That is
+// the HookHash a SetHook of this file produces.
+export const HOOK_HASH = "BBCBC4186CC7A73493D4CF1E175153E4245D2FC1ED60641B8B47E4A93BECFF6B";
 
 export function accountBytes(api, address) {
   const raw = api.libraries.rippleAddressCodec.decodeAccountID(address);

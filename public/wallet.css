@@ -54,7 +54,7 @@ button, a.b {
   text-decoration: none;
 }
 .g, a.b.g { background: transparent; color: var(--ghost); border: 1px solid var(--ghost-border); }
-input {
+input, select {
   box-sizing: border-box;
   width: 100%;
   margin: .3rem 0;
@@ -165,6 +165,22 @@ html[data-shell="phone"] button.theme {
   font-weight: 650;
 }
 html[data-shell="phone"] .panel h2 { display: none; }
+html[data-shell="phone"] #settings h2 { display: block; }
+.seg { display: flex; gap: 0.4rem; margin: 0 0 1rem; }
+.seg button { flex: 1 1 0; width: auto; margin: 0; padding: 0.55rem 0.4rem; background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 650; }
+.seg button.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.warn { color: var(--warn); }
+html[data-shell="desk"] #settings { display: none; grid-column: 1 / -1; }
+html[data-shell="desk"] #layout.settings-open #send,
+html[data-shell="desk"] #layout.settings-open #receive,
+html[data-shell="desk"] #layout.settings-open #activity { display: none; }
+html[data-shell="desk"] #layout.settings-open #settings { display: block; }
+label.setting { display: flex; flex-direction: column; gap: 0.25rem; margin: 0 0 0.8rem; color: var(--muted); font-size: 0.8125rem; font-weight: 650; }
+.kv { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 0.35rem 0.75rem; margin: 0.2rem 0 0.6rem; font-size: 0.8125rem; }
+.kv span:nth-child(odd) { color: var(--muted); }
+.kv span:nth-child(even) { overflow-wrap: anywhere; }
+button.side { margin-top: 0.6rem; }
+button.side.on { background: var(--accent); color: var(--accent-ink); }
 html[data-shell="phone"] nav.tabs {
   position: fixed;
   left: 0;
@@ -184,9 +200,7 @@ html[data-shell="phone"] nav.tabs {
 html[data-shell="phone"] nav.tabs button, html[data-shell="phone"] nav.tabs a {
   appearance: none;
   -webkit-appearance: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   flex: 1 1 0;
   width: auto;
   min-width: 0;
@@ -198,10 +212,13 @@ html[data-shell="phone"] nav.tabs button, html[data-shell="phone"] nav.tabs a {
   border: 0;
   border-radius: .7rem;
   text-decoration: none;
+  text-align: center;
   font: inherit;
-  font-size: .8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: .72rem;
   font-weight: 700;
-  line-height: 1;
+  line-height: 2.75rem;
   white-space: nowrap;
 }
 html[data-shell="phone"] nav.tabs button.on, html[data-shell="phone"] nav.tabs a.on { background: var(--accent); color: var(--accent-ink); }

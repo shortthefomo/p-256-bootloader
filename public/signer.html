@@ -157,11 +157,20 @@
     cursor: pointer;
   }
   html[data-shell="phone"] #nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; align-items: center; box-sizing: border-box; width: 100%; gap: .2rem; margin: 0; padding: .4rem .4rem calc(.45rem + env(safe-area-inset-bottom)); background: var(--nav); border-top: 1px solid var(--line); }
-  html[data-shell="phone"] #nav .tab { display: flex; align-items: center; justify-content: center; flex: 1 1 0; min-width: 0; height: 2.75rem; padding: 0 .15rem; font-size: .8rem; white-space: nowrap; }
+  html[data-shell="phone"] #nav .tab { display: block; flex: 1 1 0; min-width: 0; height: 2.75rem; padding: 0 .1rem; overflow: hidden; text-overflow: ellipsis; font-size: .72rem; line-height: 2.75rem; text-align: center; white-space: nowrap; }
+  .seg { display: flex; gap: 0.4rem; margin: 0 0 1rem; padding: 0.25rem; background: var(--surface); border: 1px solid var(--line); border-radius: 0.8rem; }
+  .seg .tab { flex: 1 1 0; box-sizing: border-box; height: 2.4rem; padding: 0 0.4rem; }
+  .settings { display: flex; flex-direction: column; gap: 0.9rem; }
+  html[data-shell="desk"] .settings { max-width: 40rem; }
+  label.setting { display: flex; flex-direction: column; align-items: stretch; gap: 0.25rem; margin: 0 0 0.9rem; }
+  label.setting span { color: var(--muted); font-size: 0.8125rem; font-weight: 650; }
+  .kv { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 0.35rem 0.75rem; margin: 0.2rem 0 0.6rem; font-size: 0.8125rem; }
+  .kv span:nth-child(odd) { color: var(--muted); }
+  .kv span:nth-child(even) { overflow-wrap: anywhere; }
   html[data-shell="desk"] #shell { display: flex; align-items: stretch; }
   html[data-shell="desk"] #nav { width: 15rem; flex: none; display: flex; flex-direction: column; gap: .25rem; padding: 1.1rem .75rem 1rem; border-right: 1px solid var(--line); position: sticky; top: 0; height: 100vh; box-sizing: border-box; }
   html[data-shell="desk"] #nav .tab { width: 100%; text-align: left; padding: .7rem .85rem; }
-  html[data-shell="desk"] .nav-foot { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; padding-top: 0.75rem; }
+  html[data-shell="desk"] .nav-foot { margin-top: auto; display: grid; grid-template-columns: 1fr; gap: 0.4rem; padding-top: 0.75rem; }
   html[data-shell="desk"] .nav-foot button {
     appearance: none;
     width: 100%;
@@ -229,7 +238,7 @@
     html[data-shell="desk"] #shell { flex-direction: column; }
     html[data-shell="desk"] #nav { width: auto; height: auto; position: sticky; top: 0; flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
     html[data-shell="desk"] #nav .brand { width: 100%; }
-    html[data-shell="desk"] .nav-foot { margin-top: 0; width: auto; padding-top: 0; grid-template-columns: auto auto; }
+    html[data-shell="desk"] .nav-foot { margin-top: 0; width: auto; padding-top: 0; grid-template-columns: auto; }
     html[data-shell="desk"] .nav-foot button { width: auto; padding: 0 0.7rem; }
     html[data-shell="desk"] .split { grid-template-columns: 1fr; }
     html[data-shell="desk"] .tx-head { display: none; }
