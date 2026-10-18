@@ -11,7 +11,7 @@ import {
   shortAddress,
 } from "./scan.mjs";
 import { TX_KINDS, transactionFromKind } from "./tx-forms.mjs";
-import { incomingOffer, normalizeUriToken } from "./uri-tokens.mjs";
+import { heldOffer, incomingOffer, normalizeUriToken } from "./uri-tokens.mjs";
 import {
   asciiHex,
   base64url,
@@ -648,7 +648,7 @@ function composer({ account, back }) {
     type: "button",
     onclick: () => sendForm(account),
   }, ["Back to send"])];
-  screen("Other transaction", shell() === "desk" ? [el("div", { class: "card form" }, body)] : body, "send");
+  screen("Other transaction", shell() === "desk" ? [el("div", { class: "card form" }, body)] : body, shell() === "phone" ? "transfer" : "send");
   review.addEventListener("click", () => {
     const values = Object.fromEntries([...inputs].map(([key, input]) => [key, input.value]));
     try {
@@ -679,7 +679,7 @@ function renderNav(active) {
   nav.hidden = false;
   const phone = shell() === "phone";
   const items = phone
-    ? ["home", "send", "nfts", "scan", "receive", "settings"]
+    ? ["home", "transfer", "nfts", "scan", "settings"]
     : ["home", "send", "receive", "nfts", "activity", "scan", "settings"];
   const buttons = items.map((id) => {
     const label = text(id);
@@ -1060,7 +1060,7 @@ async function paintVersion(body, account) {
 
 function route(id, account) {
   if (id === "home") walletHome(account);
-  else if (id === "send") sendForm(account);
+  else if (id === "send" || id === "transfer") sendForm(account);
   else if (id === "scan") scan(account);
   else if (id === "receive") receive(account);
   else if (id === "nfts") uriTokens(account);
@@ -1127,14 +1127,10 @@ function declinedOffers() {
   }
 }
 
-function declineOffer(key, button) {
+function declineOffer(key) {
   const set = declinedOffers();
   set.add(key);
   try { sessionStorage.setItem(DECLINED_KEY, JSON.stringify([...set])); } catch { /* session storage can be unavailable */ }
-  const row = button.closest(".tx");
-  if (!row) return;
-  row.classList.remove("offer");
-  row.querySelector(".tx-actions")?.remove();
 }
 
 async function offerMap(account, rows) {
@@ -1157,34 +1153,46 @@ async function offerMap(account, rows) {
   return map;
 }
 
-function txRow(row, offer, account) {
+function txRow(row, offer, account, token) {
   const type = row.type || "Transaction";
   const links = explorerLinks(row.hash);
   const ok = Boolean(row.ok);
   const detail = txDetail(type, row.line || "");
   const end = [];
   if (!ok) end.push(el("span", { class: "tx-flag" }, ["Failed"]));
-  end.push(offer && links[0]
+  const hash = offer && token && links[0]
     ? el("a", { class: "tx-hash", href: links[0].url, target: "_blank", rel: "noopener" }, [shortAddress(row.hash)])
-    : el("span", { class: "tx-hash" }, [shortAddress(row.hash)]));
-  const actions = offer ? el("div", { class: "tx-actions" }, [
-    el("button", {
-      type: "button",
-      onclick: () => signToken(account, "URITokenBuy", { id: offer.id, xah: offer.xah }),
-    }, [text("nftAccept")]),
-    el("button", {
-      class: "ghost",
-      type: "button",
-      onclick: (event) => declineOffer(offer.key, event.currentTarget),
-    }, [text("nftDecline")]),
-  ]) : null;
+    : el("span", { class: "tx-hash" }, [shortAddress(row.hash)]);
+  if (offer && token) hash.addEventListener("click", (event) => event.stopPropagation());
+  end.push(hash);
+  if (offer && token) {
+    const title = token.code || token.uri || shortAddress(token.id);
+    const sale = priceLabel(token.amount);
+    const node = el("div", { class: ok ? "tx offer" : "tx bad offer", tabindex: "0" }, [
+      token.art
+        ? el("img", { class: "tx-art", src: token.art, alt: title })
+        : el("span", { class: "tx-art tx-art-fallback" }, [(token.code || title).slice(0, 2)]),
+      el("span", { class: "tx-type" }, [title]),
+      el("span", { class: "tx-main" }, [`${text("nftForSale")} ${sale}`]),
+      el("span", { class: "tx-end" }, end),
+    ]);
+    const open = () => uriTokens(account, { id: offer.id });
+    node.addEventListener("click", (event) => {
+      if (event.target.closest("a")) return;
+      open();
+    });
+    node.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      open();
+    });
+    return node;
+  }
   const body = [
     el("span", { class: "tx-type" }, [type]),
     el("span", { class: "tx-main" }, detail ? [detail] : []),
     el("span", { class: "tx-end" }, end),
-    actions,
   ];
-  if (offer) return el("div", { class: ok ? "tx offer" : "tx bad offer" }, body);
   const attrs = { class: ok ? "tx" : "tx bad" };
   if (links[0]) {
     attrs.href = links[0].url;
@@ -1206,10 +1214,11 @@ function txList(rows, account = "", offers = new Map()) {
   const declined = declinedOffers();
   const seen = new Set();
   const nodes = rows.map((row) => {
-    const offer = incomingOffer(row, account, offers.get(row.tokenId));
-    if (!offer || seen.has(offer.id)) return txRow(row);
+    const token = offers.get(row.tokenId);
+    const offer = incomingOffer(row, account, token);
+    if (!offer || seen.has(offer.id) || declined.has(offer.key)) return txRow(row);
     seen.add(offer.id);
-    return txRow(row, declined.has(offer.key) ? null : offer, account);
+    return txRow(row, offer, account, token);
   });
   return el("div", { class: "tx-list" }, [head, ...nodes]);
 }
@@ -1359,8 +1368,7 @@ async function walletHome(account) {
   }
 }
 
-function sendForm(account, dest = "", amount = "") {
-  rememberAccount(account);
+function sendBody(account, dest = "", amount = "") {
   const destination = el("input", {
     type: "text",
     placeholder: text("destPlaceholder"),
@@ -1378,14 +1386,6 @@ function sendForm(account, dest = "", amount = "") {
   const note = el("p", { class: "muted" }, [""]);
   const go = el("button", { type: "button" }, [shell() === "desk" ? text("showQr") : text("review")]);
   const back = safeReturn(params.get("return") || "", account);
-  const body = [
-    destination,
-    xah,
-    note,
-    go,
-    el("button", { class: "link", type: "button", onclick: () => composer({ account, back }) }, [text("otherTx")]),
-  ];
-  screen(text("send"), shell() === "desk" ? [el("div", { class: "card form" }, body)] : body, "send");
   rpc("account_info", { account, ledger_index: "validated" }).then((info) => {
     note.textContent = text("available", { amount: showAmount(info.account_data.Balance) });
   }).catch(() => {});
@@ -1400,6 +1400,40 @@ function sendForm(account, dest = "", amount = "") {
     }
     pay({ account, dest: destination.value.trim(), xah: typed, back }).catch((error) => rejected(account, back, error));
   });
+  return [
+    destination,
+    xah,
+    note,
+    go,
+    el("button", { class: "link", type: "button", onclick: () => composer({ account, back }) }, [text("otherTx")]),
+  ];
+}
+
+function payScreen(account, mode, nodes) {
+  const sendBtn = el("button", {
+    class: mode === "send" ? "tab on" : "tab",
+    type: "button",
+    onclick: () => sendForm(account),
+  }, [text("send")]);
+  const receiveBtn = el("button", {
+    class: mode === "receive" ? "tab on" : "tab",
+    type: "button",
+    onclick: () => receive(account),
+  }, [text("receive")]);
+  screen(text("transfer"), [
+    el("div", { class: "seg" }, [sendBtn, receiveBtn]),
+    ...nodes,
+  ], "transfer");
+}
+
+function sendForm(account, dest = "", amount = "") {
+  rememberAccount(account);
+  const body = sendBody(account, dest, amount);
+  if (shell() === "phone") {
+    payScreen(account, "send", body);
+    return;
+  }
+  screen(text("send"), [el("div", { class: "card form" }, body)], "send");
 }
 
 function receiveParts(account) {
@@ -1439,9 +1473,11 @@ function receiveParts(account) {
 function receive(account) {
   rememberAccount(account);
   const parts = receiveParts(account);
-  screen(text("receive"), [
-    shell() === "desk" ? el("div", { class: "split card" }, parts) : el("div", {}, parts),
-  ], "receive");
+  if (shell() === "phone") {
+    payScreen(account, "receive", parts);
+    return;
+  }
+  screen(text("receive"), [el("div", { class: "split card" }, parts)], "receive");
 }
 
 async function listedTokens(account) {
@@ -1481,33 +1517,6 @@ function plainPrice(value) {
   return plain;
 }
 
-function mintForm(account) {
-  const uri = el("input", { type: "text", placeholder: text("nftUri"), autocomplete: "off", spellcheck: "false" });
-  const price = el("input", { type: "text", placeholder: text("nftPrice"), inputMode: "decimal", autocomplete: "off" });
-  const buyer = el("input", { type: "text", placeholder: text("nftBuyer"), autocomplete: "off", spellcheck: "false" });
-  const burnable = el("input", { type: "checkbox" });
-  const go = el("button", { type: "button" }, [text("nftMint")]);
-  go.addEventListener("click", () => {
-    try {
-      const values = { uri: uri.value.trim(), burnable: burnable.checked ? "1" : "" };
-      const xah = plainPrice(price.value);
-      if (xah) values.xah = xah;
-      if (buyer.value.trim()) values.destination = buyer.value.trim();
-      signToken(account, "URITokenMint", values);
-    } catch (error) {
-      rejected(account, tokenBack(account), error);
-    }
-  });
-  return el("section", { class: "card" }, [
-    el("h2", {}, [text("nftMint")]),
-    uri,
-    price,
-    buyer,
-    el("label", {}, [burnable, el("span", {}, [text("nftBurnable")])]),
-    go,
-  ]);
-}
-
 function sellFields(account, id) {
   const price = el("input", { type: "text", placeholder: text("nftPrice"), inputMode: "decimal", autocomplete: "off" });
   const buyer = el("input", { type: "text", placeholder: text("nftBuyer"), autocomplete: "off", spellcheck: "false" });
@@ -1525,54 +1534,192 @@ function sellFields(account, id) {
   return el("div", {}, [price, buyer, go]);
 }
 
-function buyForm(account) {
-  const id = el("input", { type: "text", placeholder: text("nftTokenId"), autocomplete: "off", spellcheck: "false" });
-  const price = el("input", { type: "text", placeholder: text("nftPrice"), inputMode: "decimal", autocomplete: "off" });
-  const go = el("button", { class: "ghost", type: "button" }, [text("nftBuy")]);
-  go.addEventListener("click", () => {
-    try {
-      const xah = plainPrice(price.value);
-      if (!xah) throw new Error(text("amountInvalid"));
-      signToken(account, "URITokenBuy", { id: id.value.trim(), xah });
-    } catch (error) {
-      rejected(account, tokenBack(account), error);
-    }
+function tokenArt(token, title) {
+  const frame = el("div", { class: "nft-art" });
+  if (!token.art) {
+    frame.append(el("div", { class: "nft-fallback" }, [title]));
+    return frame;
+  }
+  const image = el("img", { src: token.art, alt: title });
+  image.addEventListener("error", () => {
+    frame.replaceChildren(el("div", { class: "nft-fallback" }, [title]));
   });
-  return el("section", { class: "card" }, [el("h2", {}, [text("nftBuy")]), id, price, go]);
+  frame.append(image);
+  return frame;
 }
 
-function tokenCard(account, token, openSell) {
-  const title = token.code || token.uri || token.id;
-  const bits = [];
-  if (token.edition) bits.push(`${text("nftEdition")} ${token.edition}`);
-  if (token.issuer) bits.push(shortAddress(token.issuer));
-  const sale = priceLabel(token.amount);
-  const actions = [
-    el("button", {
-      class: "ghost",
-      type: "button",
-      onclick: () => signToken(account, "URITokenBurn", { id: token.id }),
-    }, [text("nftBurn")]),
-  ];
-  if (sale) {
-    actions.push(el("button", {
-      class: "ghost",
-      type: "button",
-      onclick: () => signToken(account, "URITokenCancelSellOffer", { id: token.id }),
-    }, [text("nftCancelSale")]));
+function tokenTitle(token) {
+  return token.code || token.uri || shortAddress(token.id);
+}
+
+function collectItems(account, tokens, offers) {
+  const declined = declinedOffers();
+  const items = tokens.map((token) => ({ token, offer: null }));
+  const owned = new Set(tokens.map((token) => token.id));
+  for (const token of offers.values()) {
+    const offer = heldOffer(account, token);
+    if (!offer || owned.has(token.id) || declined.has(offer.key)) continue;
+    items.push({ token, offer });
   }
-  const copy = [
-    el("strong", {}, [title]),
-    bits.length ? el("p", { class: "muted" }, [bits.join(" · ")]) : null,
-    sale ? el("p", {}, [`${text("nftForSale")} ${sale}`]) : null,
-    token.destination ? el("p", { class: "muted" }, [shortAddress(token.destination)]) : null,
-    el("div", { class: "nft-actions" }, actions),
-    el("details", openSell ? { open: "open" } : {}, [el("summary", {}, [text("nftSell")]), sellFields(account, token.id)]),
-  ];
-  return el("article", { class: "nft" }, [
-    token.art ? el("img", { src: token.art, alt: title }) : null,
-    el("div", {}, copy),
+  return items;
+}
+
+function galleryCard(item, onOpen) {
+  const title = tokenTitle(item.token);
+  const sale = priceLabel(item.token.amount);
+  return el("button", { class: item.offer ? "nft incoming" : "nft", type: "button", onclick: onOpen }, [
+    tokenArt(item.token, title),
+    el("div", { class: "nft-body" }, [
+      el("strong", {}, [title]),
+      item.token.edition ? el("p", { class: "muted" }, [`${text("nftEdition")} ${item.token.edition}`]) : null,
+      sale ? el("p", { class: "nft-sale" }, [`${text("nftForSale")} ${sale}`]) : null,
+    ]),
   ]);
+}
+
+function showNftBrowser(account, items, focus) {
+  let index = focus.openIndex >= 0 ? focus.openIndex : 0;
+  let selling = Boolean(focus.sell);
+  const note = el("p", { class: "muted" }, [items.length ? "" : text("nftEmpty")]);
+  const grid = el("div", { class: "nft-grid" });
+  const stage = el("div", { class: "nft-stage" });
+  const caption = el("div", { class: "nft-caption" });
+  const actions = el("div", { class: "nft-overlay-actions" });
+  const sellBox = el("div", { class: "nft-sell" });
+  const count = el("p", { class: "nft-count" }, [""]);
+  const prev = el("button", { class: "nft-step", type: "button" }, ["‹"]);
+  const next = el("button", { class: "nft-step", type: "button" }, ["›"]);
+  const overlay = el("div", {
+    class: "nft-overlay",
+    hidden: "hidden",
+    role: "dialog",
+    "aria-modal": "true",
+  }, [
+    el("div", { class: "nft-dialog" }, [
+      el("button", { class: "nft-close", type: "button", onclick: () => closeOverlay() }, [text("nftClose")]),
+      stage,
+      caption,
+      actions,
+      sellBox,
+      el("div", { class: "nft-pager" }, [prev, count, next]),
+    ]),
+  ]);
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) closeOverlay();
+  });
+
+  function closeOverlay() {
+    overlay.hidden = true;
+  }
+
+  function rebuildGrid() {
+    note.textContent = items.length ? "" : text("nftEmpty");
+    grid.replaceChildren(...items.map((item, at) => galleryCard(item, () => openAt(at, false))));
+  }
+
+  function openAt(at, keepSell) {
+    if (!items.length) {
+      closeOverlay();
+      return;
+    }
+    index = (at + items.length) % items.length;
+    if (!keepSell) selling = false;
+    paint();
+    overlay.hidden = false;
+  }
+
+  function paint() {
+    const item = items[index];
+    if (!item) {
+      closeOverlay();
+      return;
+    }
+    const { token, offer } = item;
+    const title = tokenTitle(token);
+    const sale = priceLabel(token.amount);
+    stage.replaceChildren(tokenArt(token, title));
+    const lines = [el("strong", {}, [title])];
+    if (token.edition) lines.push(el("p", {}, [`${text("nftEdition")} ${token.edition}`]));
+    if (sale) lines.push(el("p", {}, [`${text("nftForSale")} ${sale}`]));
+    if (token.destination) lines.push(el("p", {}, [shortAddress(token.destination)]));
+    caption.replaceChildren(...lines);
+    const controls = [];
+    if (offer) {
+      controls.push(el("button", {
+        type: "button",
+        onclick: () => signToken(account, "URITokenBuy", { id: offer.id, xah: offer.xah }),
+      }, [text("nftAccept")]));
+      controls.push(el("button", {
+        class: "ghost",
+        type: "button",
+        onclick: () => {
+          declineOffer(offer.key);
+          items.splice(index, 1);
+          selling = false;
+          rebuildGrid();
+          if (!items.length) closeOverlay();
+          else {
+            if (index >= items.length) index = items.length - 1;
+            paint();
+          }
+        },
+      }, [text("nftDecline")]));
+    } else {
+      if (sale) {
+        controls.push(el("button", {
+          class: "ghost",
+          type: "button",
+          onclick: () => signToken(account, "URITokenCancelSellOffer", { id: token.id }),
+        }, [text("nftCancelSale")]));
+      }
+      controls.push(el("button", {
+        type: "button",
+        onclick: () => {
+          selling = !selling;
+          paint();
+        },
+      }, [text("nftSell")]));
+      controls.push(el("button", {
+        class: "ghost",
+        type: "button",
+        onclick: () => signToken(account, "URITokenBurn", { id: token.id }),
+      }, [text("nftBurn")]));
+    }
+    actions.replaceChildren(...controls);
+    sellBox.replaceChildren(!offer && selling ? sellFields(account, token.id) : null);
+    count.textContent = text("nftCount", { n: index + 1, m: items.length });
+    prev.disabled = items.length < 2;
+    next.disabled = items.length < 2;
+  }
+
+  prev.addEventListener("click", () => openAt(index - 1, false));
+  next.addEventListener("click", () => openAt(index + 1, false));
+  rebuildGrid();
+  if (focus.openIndex >= 0) {
+    index = focus.openIndex;
+    paint();
+    overlay.hidden = false;
+  }
+  screen(text("nfts"), [note, grid, overlay], "nfts");
+  const live = viewGen;
+  const onKey = (event) => {
+    if (live !== viewGen) {
+      document.removeEventListener("keydown", onKey);
+      return;
+    }
+    if (overlay.hidden) return;
+    const tag = event.target?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (event.key === "Escape") closeOverlay();
+    else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      openAt(index + 1, false);
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      openAt(index - 1, false);
+    }
+  };
+  document.addEventListener("keydown", onKey);
 }
 
 async function uriTokens(account, focus = {}) {
@@ -1580,23 +1727,33 @@ async function uriTokens(account, focus = {}) {
   screen(text("nfts"), [el("p", { class: "muted" }, [text("loading")])], "nfts");
   const gen = viewGen;
   try {
-    const tokens = await listedTokens(account);
+    const [tokens, rows] = await Promise.all([
+      listedTokens(account),
+      recent(account, 15).catch(() => []),
+    ]);
     if (gen !== viewGen) return;
+    const offers = await offerMap(account, rows);
+    if (gen !== viewGen) return;
+    const items = collectItems(account, tokens, offers);
     const wanted = String(focus.id || "").toUpperCase();
-    const cards = tokens.length
-      ? tokens.map((token) => tokenCard(account, token, focus.act === "sell" && token.id === wanted))
-      : [el("p", { class: "muted" }, [text("nftEmpty")])];
-    const missingSale = focus.act === "sell" && wanted && !tokens.some((token) => token.id === wanted);
-    screen(text("nfts"), [
-      mintForm(account),
-      ...cards,
-      missingSale ? el("section", { class: "card" }, [
-        el("h2", {}, [text("nftSell")]),
-        el("p", { class: "mono" }, [wanted]),
-        sellFields(account, wanted),
-      ]) : null,
-      buyForm(account),
-    ], "nfts");
+    let openIndex = wanted ? items.findIndex((item) => item.token.id === wanted) : -1;
+    if (wanted && openIndex < 0) {
+      try {
+        const entry = await rpc("ledger_entry", { index: wanted, ledger_index: "validated" });
+        if (gen !== viewGen) return;
+        const token = normalizeUriToken({ ...(entry.node || {}), index: entry.index || wanted });
+        const offer = heldOffer(account, token);
+        if (token.id && !(offer && declinedOffers().has(offer.key))) {
+          items.push({ token, offer });
+          openIndex = items.length - 1;
+        }
+      } catch {
+        // The id is not a URI token on the ledger.
+      }
+    }
+    if (gen !== viewGen) return;
+    const selling = focus.act === "sell" && openIndex >= 0 && !items[openIndex].offer;
+    showNftBrowser(account, items, { openIndex, sell: selling });
   } catch {
     if (gen !== viewGen) return;
     screen(text("nfts"), [el("p", {}, [text("nftUnavailable")])], "nfts");

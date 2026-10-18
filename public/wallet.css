@@ -126,11 +126,36 @@ details.raw pre.json { margin: 0; border: 0; border-radius: 0; border-top: 1px s
   text-decoration: none;
 }
 a.tx { cursor: pointer; color: inherit; text-decoration: none; }
-.nft { display: flex; gap: 0.85rem; align-items: flex-start; margin: 0.85rem 0; padding-bottom: 0.85rem; border-bottom: 1px solid var(--line); }
-.nft img { width: 4.75rem; height: auto; border-radius: 0.45rem; flex: none; background: var(--surface-2); }
-.nft strong, .nft .mono { overflow-wrap: anywhere; }
+.nft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); gap: 0.9rem; margin: 0.4rem 0 1rem; }
+.nft { display: flex; flex-direction: column; min-width: 0; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); overflow: hidden; }
+.nft-art { display: flex; align-items: center; justify-content: center; aspect-ratio: 5 / 7; background: var(--surface-2); }
+.nft-art img { width: 100%; height: 100%; object-fit: contain; background: transparent; }
+.nft-fallback { padding: 1rem; color: var(--muted); font-size: 0.85rem; font-weight: 650; text-align: center; overflow-wrap: anywhere; }
+.nft-body { padding: 0.75rem 0.85rem 0.95rem; }
+.nft-body strong, .nft .mono { display: block; overflow-wrap: anywhere; }
+.nft-body p { margin: 0.25rem 0; }
+.nft-sale { font-weight: 650; }
+button.nft { display: flex; flex-direction: column; width: 100%; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); color: inherit; font: inherit; font-weight: 400; text-align: left; cursor: pointer; }
+button.nft strong { font-weight: 650; }
 .nft-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.nft-actions a.b { width: auto; display: inline-block; margin: 0; padding: 0.45rem 0.75rem; }
+.nft-actions a.b { width: auto; display: inline-block; margin: 0.35rem 0 0; padding: 0.45rem 0.75rem; }
+.nft-overlay { position: fixed; inset: 0; z-index: 40; display: flex; align-items: safe center; justify-content: center; box-sizing: border-box; padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)); background: rgba(6, 8, 12, 0.84); overflow: auto; }
+.nft-overlay[hidden] { display: none !important; }
+.nft-dialog { width: min(22rem, 100%); margin: auto; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+.nft-stage { width: min(20rem, 86vw); }
+.nft-overlay .nft-art { width: 100%; border-radius: 1.15rem; background: transparent; }
+.nft-caption { color: #f4f7fb; text-align: center; }
+.nft-caption strong { display: block; }
+.nft-caption p { margin: 0.15rem 0; color: #d5deea; }
+.nft-overlay-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; width: 100%; }
+.nft-overlay-actions button, .nft-overlay-actions a.b { width: auto; margin: 0; padding: 0.7rem 1rem; }
+.nft-pager { display: flex; align-items: center; justify-content: center; gap: 0.85rem; color: #f4f7fb; }
+.nft-count { margin: 0; }
+button.nft-close, button.nft-step { width: auto; margin: 0; padding: 0; background: transparent; color: #f4f7fb; border: 1px solid rgba(255, 255, 255, 0.35); font: inherit; font-weight: 650; }
+button.nft-close { align-self: flex-end; height: 2rem; padding: 0 0.75rem; border-radius: 999px; }
+button.nft-step { width: 2.25rem; height: 2.25rem; border-radius: 999px; font-size: 1.2rem; line-height: 1; }
+button.nft-step:disabled { opacity: 0.35; }
+html:has(.nft-overlay:not([hidden])) { overflow: hidden; }
 .tx-type { grid-area: type; font-weight: 650; font-size: 1rem; color: var(--text); }
 .tx-main {
   grid-area: main;
@@ -147,7 +172,9 @@ html[data-shell="phone"] .tx-main:empty { display: none; }
 .tx-end { grid-area: end; display: flex; align-items: baseline; justify-content: flex-end; gap: 0.45rem; white-space: nowrap; }
 .tx-hash { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; font-weight: 400; color: var(--muted); }
 .tx-flag { font-size: 0.75rem; font-weight: 650; color: var(--danger); }
-.tx.offer { grid-template-areas: "type end" "main end" "actions actions"; align-items: center; }
+.tx.offer { grid-template-columns: 2.6rem minmax(0, 1fr) auto; grid-template-areas: "art type end" "art main end"; align-items: center; cursor: pointer; }
+.tx-art { grid-area: art; width: 2.4rem; height: 3.3rem; object-fit: contain; border-radius: 0.35rem; background: var(--surface-2); }
+.tx-art-fallback { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 0.75rem; font-weight: 700; }
 .tx-actions { grid-area: actions; display: flex; flex-wrap: wrap; gap: 0.4rem; padding-top: 0.35rem; }
 .tx-actions button, .tx-actions a.b { width: auto; display: inline-block; margin: 0; padding: 0.4rem 0.7rem; }
 .tx.bad .tx-type { color: var(--danger); }
@@ -173,7 +200,10 @@ html[data-shell="phone"] button.theme {
   font-weight: 650;
 }
 html[data-shell="phone"] .panel h2 { display: none; }
-html[data-shell="phone"] #settings h2 { display: block; }
+html[data-shell="phone"] #settings h2,
+html[data-shell="phone"] #send h2,
+html[data-shell="phone"] #receive h2 { display: block; }
+html[data-shell="phone"] #receive.on { margin-top: 1.4rem; padding-top: 0.35rem; border-top: 1px solid var(--line); }
 .seg { display: flex; gap: 0.4rem; margin: 0 0 1rem; }
 .seg button { flex: 1 1 0; width: auto; margin: 0; padding: 0.55rem 0.4rem; background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 650; }
 .seg button.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
@@ -269,6 +299,8 @@ html[data-shell="desk"] .panel {
 }
 html[data-shell="desk"] #activity,
 html[data-shell="desk"] #nfts { grid-column: 1 / -1; min-width: 0; }
+html[data-shell="desk"] #nfts .nft { background: var(--surface-2); }
+html[data-shell="desk"] #nfts .nft-art { background: var(--bg); }
 html[data-shell="desk"] #send input,
 html[data-shell="desk"] #send a.b,
 html[data-shell="desk"] #receive a.b { max-width: 28rem; }
@@ -290,7 +322,7 @@ html[data-shell="desk"] .tx {
   align-items: center;
   padding: 0.7rem 0.75rem;
 }
-html[data-shell="desk"] .tx.offer { grid-template-areas: "type main end" "actions actions actions"; }
+html[data-shell="desk"] .tx.offer { grid-template-columns: 2.6rem 9.5rem minmax(0, 1fr) auto; grid-template-areas: "art type main end"; }
 html[data-shell="desk"] .tx-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html[data-shell="desk"] .tx-main { font-size: 0.95rem; color: var(--text); }
 @media (max-width: 720px) {
@@ -303,7 +335,7 @@ html[data-shell="desk"] .tx-main { font-size: 0.95rem; color: var(--text); }
     align-items: baseline;
     padding: 0.7rem 0;
   }
-  html[data-shell="desk"] .tx.offer { grid-template-areas: "type end" "main end" "actions actions"; }
+  html[data-shell="desk"] .tx.offer { grid-template-columns: 2.6rem minmax(0, 1fr) auto; grid-template-areas: "art type end" "art main end"; }
   html[data-shell="desk"] .tx-main { font-size: 0.8125rem; color: var(--muted); }
   html[data-shell="desk"] .tx-main:empty { display: none; }
 }

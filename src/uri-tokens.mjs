@@ -51,17 +51,23 @@ export function normalizeUriToken(object) {
   };
 }
 
-// A private sell offer still open for this account. The recipient accepts it
-// with URITokenBuy. The ledger has no decline: only the owner can cancel.
-export function incomingOffer(row, account, token) {
-  if (!row?.ok || row.type !== "URITokenCreateSellOffer" || !account || !token) return null;
-  if (row.tokenId !== token.id || token.owner === account || token.destination !== account) return null;
-  if (row.account !== token.owner || row.destination !== account) return null;
-  if (typeof token.amount !== "string" || !/^\d+$/.test(token.amount) || row.amount !== token.amount) return null;
+// The token is on offer to this account right now. The owner cannot accept it.
+export function heldOffer(account, token) {
+  if (!account || !token || token.owner === account || token.destination !== account) return null;
+  if (typeof token.amount !== "string" || !/^\d+$/.test(token.amount)) return null;
   return {
     id: token.id,
     drops: token.amount,
     xah: dropsToXah(token.amount),
     key: `${token.id}:${token.owner}:${token.amount}`,
   };
+}
+
+// A private sell offer still open for this account. The recipient accepts it
+// with URITokenBuy. The ledger has no decline: only the owner can cancel.
+export function incomingOffer(row, account, token) {
+  if (!row?.ok || row.type !== "URITokenCreateSellOffer" || !token) return null;
+  if (row.tokenId !== token.id || row.account !== token.owner || row.destination !== account) return null;
+  if (row.amount !== token.amount) return null;
+  return heldOffer(account, token);
 }
