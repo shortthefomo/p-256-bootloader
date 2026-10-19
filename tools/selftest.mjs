@@ -116,6 +116,68 @@ check("amount formats group the same drops", formatDrops(1234500000n, "plain") =
 check("typed amounts become the plain form", canonicalAmount("1,234.5", "comma-dot") === "1234.5" && canonicalAmount("1.234,5", "dot-comma") === "1234.5" && canonicalAmount("1 234.5", "space-dot") === "1234.5" && canonicalAmount("1.5", "plain") === "1.5");
 check("an unknown language uses English", translate("zz", "settings") === "Settings" && LANGUAGES.some((item) => item.id === "en") && AMOUNT_FORMATS.some((item) => item.id === "plain"));
 check("the front door follows the browser language", browserLanguage(["es-MX"]) === "es" && browserLanguage("fr-FR") === "fr" && browserLanguage(["zh-CN"]) === "zh" && browserLanguage("ja") === "ja" && browserLanguage(["ko-KR"]) === "ko" && browserLanguage("de-DE") === "de" && browserLanguage("pt-BR") === "pt" && browserLanguage(["nl", "en-GB"]) === "en" && browserLanguage("nl") === "en" && browserLanguage("") === "en" && browserLanguage(["sv-SE", "fr"]) === "fr" && signerApp.includes("browserLanguage(") && signerApp.includes('text("createWallet")') && signerApp.includes('text("setup")') && !signerApp.includes('["Create a wallet"]') && translate("en", "createWallet") === "Create a wallet" && translate("es", "createWallet") === "Crear un monedero" && translate("fr", "haveWallet") === "J’ai déjà un portefeuille" && translate("de", "openWallet") === "Wallet öffnen" && translate("pt", "attachFirewall") === "Anexar o firewall" && translate("zh", "setup") === "开始" && translate("ja", "createWallet") === "ウォレットを作る" && translate("ko", "openWallet") === "지갑 열기");
+function openLedgerLang(hash, navigatorValue, storage) {
+  const start = walletJs.indexOf('var LANGS = ["en", "es", "fr", "de", "pt", "zh", "ja", "ko"];');
+  const end = walletJs.indexOf("\nfunction shellChoice(");
+  const loggedStart = walletJs.indexOf("function loggedIn()");
+  const loggedEnd = walletJs.indexOf("\nfunction href(");
+  const box = {
+    URLSearchParams,
+    location: { hash: hash || "" },
+    navigator: Array.isArray(navigatorValue) || typeof navigatorValue === "string" || navigatorValue == null
+      ? { languages: navigatorValue == null ? [] : navigatorValue }
+      : navigatorValue,
+    localStorage: storage || {
+      getItem() { throw new Error("SecurityError"); },
+      setItem() { throw new Error("SecurityError"); },
+    },
+    document: { documentElement: { lang: "" } },
+  };
+  runInNewContext(`${walletJs.slice(start, end)}\n${walletJs.slice(loggedStart, loggedEnd)}\nthis.language = language; this.rememberPref = rememberPref; this.browserLanguage = browserLanguage;`, box);
+  return box;
+}
+function langStore(bag) {
+  return {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(bag, key) ? bag[key] : null; },
+    setItem(key, value) { bag[key] = String(value); },
+  };
+}
+const langSamples = [["es-MX"], "fr-FR", ["zh-CN"], "ja", ["ko-KR"], "de-DE", "pt-BR", ["nl", "en-GB"], "nl", "", ["sv-SE", "fr"], ["zh-Hans"], ["pt", "en"]];
+const langProbe = openLedgerLang("", []);
+const langCases = [
+  ["", ["es-MX"], null, "es"],
+  ["", ["fr-FR"], null, "fr"],
+  ["", ["zh-CN"], null, "zh"],
+  ["", ["zh-Hans", "en"], null, "zh"],
+  ["", ["ja"], null, "ja"],
+  ["", ["ko-KR"], null, "ko"],
+  ["", ["de-DE"], null, "de"],
+  ["", ["pt-BR"], null, "pt"],
+  ["", ["nl", "en-GB"], null, "en"],
+  ["", ["nl"], null, "en"],
+  ["", "", null, "en"],
+  ["", ["sv-SE", "fr"], null, "fr"],
+  ["", { languages: { 0: "pt-BR", length: 1 } }, null, "pt"],
+  ["", { language: "ko-KR" }, null, "ko"],
+  ["#token=abc", ["es-MX"], null, "es"],
+  ["#login=1", ["es-MX"], null, "en"],
+  ["#login=1&view=nfts", ["ja"], null, "en"],
+  ["", ["ja"], langStore({ "p256-lang": "fr" }), "fr"],
+  ["#login=1", ["ja"], langStore({ "p256-lang": "de" }), "de"],
+  ["", ["es-MX"], langStore({ "p256-lang": "zz" }), "es"],
+  ["#login=1", ["es-MX"], langStore({ "p256-lang": "zz" }), "en"],
+];
+const langFailures = [];
+if (!langSamples.every((sample) => langProbe.browserLanguage(sample) === browserLanguage(sample))) langFailures.push("tags");
+for (const [hash, languages, storage, want] of langCases) {
+  const box = openLedgerLang(hash, languages, storage);
+  const got = box.language();
+  if (got !== want || box.document.documentElement.lang !== want) langFailures.push(`${hash} ${JSON.stringify(languages)} => ${got}/${box.document.documentElement.lang}`);
+}
+const langSession = openLedgerLang("", ["ja"]);
+langSession.rememberPref("p256-lang", "ko");
+if (langSession.language() !== "ko") langFailures.push("session");
+check("a visitor follows the browser language", langFailures.length === 0 && walletJs.includes('pref("p256-lang", LANGS, "")') && walletJs.includes('loggedIn() ? "en" : browserLanguage(browserLanguages())'), langFailures.join("; "));
 check("chinese japanese and korean are listed", ["zh", "ja", "ko"].every((id) => LANGUAGES.some((item) => item.id === id)) && translate("zh", "settings") === "设置" && translate("ja", "settings") === "設定" && translate("ko", "settings") === "설정" && walletJs.includes('"ko"') && walletJs.includes("한국어") && walletJs.includes("中文") && walletJs.includes("日本語"));
 check("layout choice sits in general", signerApp.includes('text("layout")') && signerApp.includes('chooseShell("desk")') && !signerApp.includes("function layoutSwitch") && walletJs.includes('shellButton("phone", "mobile")') && walletJs.includes('shellButton("desk", "desktop")') && translate("en", "mobile") === "Mobile" && translate("en", "desktop") === "Desktop");
 const localeSrc = readFileSync(new URL("../src/locale.mjs", import.meta.url), "utf8");
@@ -187,6 +249,7 @@ check("activity rows are not underlined", !signerHtml.includes("text-decoration-
 check("incoming offers look different from held tokens", translate("en", "nftOffer") === "Offer" && translate("es", "nftOffer") === "Oferta" && translate("fr", "nftOffer") === "Offre" && translate("de", "nftOffer") === "Angebot" && translate("pt", "nftOffer") === "Oferta" && translate("zh", "nftOffer") === "报价" && translate("ja", "nftOffer") === "オファー" && translate("ko", "nftOffer") === "제안" && signerApp.includes('class: `nft-pill ${kind}`') && signerApp.includes("sellBox.replaceChildren()") && !signerApp.includes("replaceChildren(!offer") && walletJs.includes('className = item.offer ? "nft-pill offer" : (listed ? "nft-pill sale" : "nft-pill held")') && walletJs.includes('nftOffer: "Offer"') && signerHtml.includes(".nft.incoming") && signerHtml.includes(".nft.held") && signerHtml.includes(".nft-pill.offer") && walletCss.includes(".nft.incoming") && walletCss.includes(".nft.held") && walletCss.includes(".nft-pill.sale"));
 check("desktop fills the window", signerHtml.includes("max-width: none") && walletCss.includes("max-width: none") && !signerHtml.includes("52rem") && !walletCss.includes("64rem"));
 check("the desktop viewer hides the page under it", walletCss.includes('html[data-shell="desk"] .nft-overlay { background: #0c0f14;') && signerHtml.includes('html[data-shell="desk"] .nft-overlay { background: #0c0f14;') && walletCss.includes('html[data-shell="desk"]:has(.nft-overlay:not([hidden])) .nft-grid { visibility: hidden; }') && signerHtml.includes('html[data-shell="desk"]:has(.nft-overlay:not([hidden])) .nft-grid { visibility: hidden; }'));
+check("the desktop nft overlay uses the window", walletCss.includes('html[data-shell="desk"] .nft-overlay .nft-page { display: grid;') && walletCss.includes("minmax(16rem, 1fr) minmax(22rem, 1fr)") && walletJs.includes('detail.className = "nft-detail"') && walletCss.includes(".nft-dialog { width: min(22rem, 100%);"));
 check("the phone viewer hides the gallery and swipes", signerHtml.includes('html[data-shell="phone"] .nft-overlay { background: #0c0f14;') && walletCss.includes('html[data-shell="phone"] .nft-overlay { background: #0c0f14;') && signerHtml.includes(".nft-grid { visibility: hidden; }") && walletCss.includes(".nft-grid { visibility: hidden; }") && signerHtml.includes('html[data-shell="phone"] .nft-grid { grid-template-columns: repeat(4, minmax(0, 1fr));') && walletCss.includes('html[data-shell="phone"] .nft-grid { grid-template-columns: repeat(4, minmax(0, 1fr));') && signerHtml.includes(".nft-filters") && walletCss.includes(".nft-filters") && signerApp.includes('"nft listed"') && walletJs.includes('"nft listed"') && translate("en", "nftAll") === "All" && translate("es", "nftOffers") === "Ofertas" && translate("de", "nftNotForSale") === "Nicht im Verkauf" && translate("ja", "nftNoMatch") === "該当なし" && translate("ko", "nftAll") === "전체" && signerHtml.includes(".nft-page.slide") && walletCss.includes(".nft-page.slide") && signerApp.includes('class: "nft-page"') && signerApp.includes("translate3d") && signerApp.includes('shell() !== "phone"') && signerApp.includes("touchstart") && walletJs.includes('className = "nft-page"') && walletJs.includes("translate3d") && walletJs.includes("if (!phone || nftSliding || event.touches.length !== 1) return") && walletJs.includes("touchstart") && walletJs.includes("stepViewer(dx < 0 ? 1 : -1)"));
 check("explorer links open in a new tab", signerApp.includes('target: "_blank"') && signerApp.includes('rel: "noopener"') && walletJs.includes('"_blank"') && walletJs.includes('"noopener"') && !walletJs.includes("links[k]"));
 check("theme defaults to dark", signerHtml.includes('getItem("p256-theme")') && signerHtml.includes('saved === "light" ? "light" : "dark"') && walletJs.includes('getItem("p256-theme")') && walletJs.startsWith("(function () {\n  var theme = \"dark\";") && !signerHtml.includes("prefers-color-scheme") && !walletCss.includes("prefers-color-scheme"));

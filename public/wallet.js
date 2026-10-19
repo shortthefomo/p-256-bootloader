@@ -150,8 +150,34 @@ function rememberPref(key, value) {
   try { localStorage.setItem(key, value); } catch (error) {}
 }
 
+// The first supported tag wins. "es-MX" matches es. Anything else is English.
+function browserLanguage(list) {
+  var tags = [];
+  if (Array.isArray(list)) tags = list.slice();
+  else if (list && typeof list !== "string" && typeof list.length === "number") {
+    for (var i = 0; i < list.length; i++) tags.push(list[i]);
+  } else tags = String(list || "").split(",");
+  for (var j = 0; j < tags.length; j++) {
+    var primary = String(tags[j] || "").trim().toLowerCase().split(/[-_]/)[0];
+    if (LANGS.indexOf(primary) >= 0) return primary;
+  }
+  return "en";
+}
+
+function browserLanguages() {
+  try {
+    return navigator.languages ? Array.from(navigator.languages) : [navigator.language || ""];
+  } catch (error) {
+    return [];
+  }
+}
+
+// A saved language wins. A visitor with none uses a supported browser language. A logged-in wallet with none stays English.
 function language() {
-  return pref("p256-lang", LANGS, "en");
+  var saved = pref("p256-lang", LANGS, "");
+  var id = saved || (loggedIn() ? "en" : browserLanguage(browserLanguages()));
+  try { document.documentElement.lang = id; } catch (error) {}
+  return id;
 }
 
 function shellChoice() {
@@ -1096,7 +1122,10 @@ function ensureOverlay() {
   var page = document.createElement("div");
   page.className = "nft-page";
   nftPage = page;
-  page.append(nftStage, nftCaption, nftActions);
+  var detail = document.createElement("div");
+  detail.className = "nft-detail";
+  detail.append(nftCaption, nftActions);
+  page.append(nftStage, detail);
   sheet.append(page);
   dialog.append(close, sheet, pager);
   nftOverlay.append(dialog);
