@@ -1591,6 +1591,8 @@ function showNftBrowser(account, items, focus) {
   const count = el("p", { class: "nft-count" }, [""]);
   const prev = el("button", { class: "nft-step", type: "button" }, ["‹"]);
   const next = el("button", { class: "nft-step", type: "button" }, ["›"]);
+  const page = el("div", { class: "nft-page" }, [stage, caption, actions, sellBox]);
+  const sheet = el("div", { class: "nft-sheet" }, [page]);
   const overlay = el("div", {
     class: "nft-overlay",
     hidden: "hidden",
@@ -1599,17 +1601,16 @@ function showNftBrowser(account, items, focus) {
   }, [
     el("div", { class: "nft-dialog" }, [
       el("button", { class: "nft-close", type: "button", onclick: () => closeOverlay() }, [text("nftClose")]),
-      stage,
-      caption,
-      actions,
-      sellBox,
+      sheet,
       el("div", { class: "nft-pager" }, [prev, count, next]),
     ]),
   ]);
   let swipeX = 0;
   let swipeY = 0;
   let swiping = false;
+  let axis = "";
   let ignoreClick = false;
+  let sliding = false;
   overlay.addEventListener("click", (event) => {
     if (ignoreClick) {
       ignoreClick = false;
@@ -1620,28 +1621,120 @@ function showNftBrowser(account, items, focus) {
     if (event.target === overlay) closeOverlay();
   }, true);
   overlay.addEventListener("touchstart", (event) => {
-    if (shell() !== "phone" || event.touches.length !== 1) return;
+    if (shell() !== "phone" || sliding || event.touches.length !== 1) return;
     const tag = event.target?.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON" || tag === "A") return;
     swipeX = event.touches[0].clientX;
     swipeY = event.touches[0].clientY;
+    axis = "";
     swiping = true;
   }, { passive: true });
+  overlay.addEventListener("touchmove", (event) => {
+    if (!swiping || sliding) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    const dx = touch.clientX - swipeX;
+    const dy = touch.clientY - swipeY;
+    if (!axis) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    }
+    if (axis !== "x") return;
+    event.preventDefault();
+    const cap = Math.max(sheet.clientWidth || 1, 1);
+    place(items.length < 2 ? dx * 0.25 : Math.max(-cap, Math.min(cap, dx)), false);
+  }, { passive: false });
   overlay.addEventListener("touchend", (event) => {
     if (!swiping) return;
     swiping = false;
     const touch = event.changedTouches[0];
-    if (!touch || items.length < 2) return;
-    const dx = touch.clientX - swipeX;
-    const dy = touch.clientY - swipeY;
-    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return;
+    const dx = touch ? touch.clientX - swipeX : 0;
+    const dy = touch ? touch.clientY - swipeY : 0;
+    const horizontal = axis === "x";
+    axis = "";
+    if (!horizontal) return;
+    if (!touch || items.length < 2 || Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) {
+      place(0, true);
+      return;
+    }
     ignoreClick = true;
-    openAt(index + (dx < 0 ? 1 : -1), false);
+    turn(dx < 0 ? 1 : -1);
   }, { passive: true });
-  overlay.addEventListener("touchcancel", () => { swiping = false; }, { passive: true });
+  overlay.addEventListener("touchcancel", () => {
+    if (!swiping) return;
+    swiping = false;
+    const horizontal = axis === "x";
+    axis = "";
+    if (horizontal && !sliding) place(0, true);
+  }, { passive: true });
+
+  function motion() {
+    return shell() === "phone" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function place(x, animate) {
+    page.classList.toggle("slide", Boolean(animate));
+    page.style.transform = `translate3d(${x}px,0,0)`;
+  }
+
+  function slide(dir) {
+    if (sliding || items.length < 2) return;
+    sliding = true;
+    const width = Math.max(sheet.clientWidth || 1, 1);
+    const target = dir > 0 ? -width : width;
+    let settled = false;
+    let timer = 0;
+    const commit = () => {
+      if (settled) return;
+      settled = true;
+      page.removeEventListener("transitionend", onEnd);
+      clearTimeout(timer);
+      if (overlay.hidden || items.length < 2) {
+        sliding = false;
+        place(0, false);
+        return;
+      }
+      place(dir > 0 ? width : -width, false);
+      openAt(index + dir, false);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          place(0, true);
+          let done = false;
+          const finish = () => {
+            if (done) return;
+            done = true;
+            page.removeEventListener("transitionend", onIn);
+            sliding = false;
+          };
+          const onIn = (event) => {
+            if (event.target !== page || event.propertyName !== "transform") return;
+            finish();
+          };
+          page.addEventListener("transitionend", onIn);
+          setTimeout(finish, 320);
+        });
+      });
+    };
+    const onEnd = (event) => {
+      if (event.target !== page || event.propertyName !== "transform") return;
+      commit();
+    };
+    page.addEventListener("transitionend", onEnd);
+    timer = setTimeout(commit, 320);
+    place(target, true);
+  }
+
+  function turn(dir) {
+    if (!motion() || items.length < 2) {
+      place(0, false);
+      openAt(index + dir, false);
+    } else slide(dir);
+  }
 
   function closeOverlay() {
     overlay.hidden = true;
+    sliding = false;
+    place(0, false);
   }
 
   function rebuildGrid() {
@@ -1732,8 +1825,8 @@ function showNftBrowser(account, items, focus) {
     next.disabled = items.length < 2;
   }
 
-  prev.addEventListener("click", () => openAt(index - 1, false));
-  next.addEventListener("click", () => openAt(index + 1, false));
+  prev.addEventListener("click", () => turn(-1));
+  next.addEventListener("click", () => turn(1));
   rebuildGrid();
   if (focus.openIndex >= 0) {
     index = focus.openIndex;
@@ -1753,10 +1846,10 @@ function showNftBrowser(account, items, focus) {
     if (event.key === "Escape") closeOverlay();
     else if (event.key === "ArrowRight") {
       event.preventDefault();
-      openAt(index + 1, false);
+      turn(1);
     } else if (event.key === "ArrowLeft") {
       event.preventDefault();
-      openAt(index - 1, false);
+      turn(-1);
     }
   };
   document.addEventListener("keydown", onKey);

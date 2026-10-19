@@ -553,6 +553,9 @@ var nftActions = null;
 var nftCount = null;
 var nftPrev = null;
 var nftNext = null;
+var nftPage = null;
+var nftSheet = null;
+var nftSliding = false;
 
 function ensureOverlay() {
   if (nftOverlay) return;
@@ -564,6 +567,7 @@ function ensureOverlay() {
   var swipeX = 0;
   var swipeY = 0;
   var swiping = false;
+  var axis = "";
   var ignoreClick = false;
   nftOverlay.addEventListener("click", function (event) {
     if (ignoreClick) {
@@ -575,25 +579,54 @@ function ensureOverlay() {
     if (event.target === nftOverlay) closeViewer();
   }, true);
   nftOverlay.addEventListener("touchstart", function (event) {
-    if (!phone || event.touches.length !== 1) return;
+    if (!phone || nftSliding || event.touches.length !== 1) return;
     var tag = event.target && event.target.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON" || tag === "A") return;
     swipeX = event.touches[0].clientX;
     swipeY = event.touches[0].clientY;
+    axis = "";
     swiping = true;
   }, { passive: true });
+  nftOverlay.addEventListener("touchmove", function (event) {
+    if (!swiping || nftSliding) return;
+    var touch = event.touches[0];
+    if (!touch) return;
+    var dx = touch.clientX - swipeX;
+    var dy = touch.clientY - swipeY;
+    if (!axis) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    }
+    if (axis !== "x") return;
+    event.preventDefault();
+    var cap = Math.max((nftSheet && nftSheet.clientWidth) || 1, 1);
+    var items = viewerItems();
+    placePage(items.length < 2 ? dx * 0.25 : Math.max(-cap, Math.min(cap, dx)), false);
+  }, { passive: false });
   nftOverlay.addEventListener("touchend", function (event) {
     if (!swiping) return;
     swiping = false;
     var touch = event.changedTouches[0];
-    if (!touch) return;
-    var dx = touch.clientX - swipeX;
-    var dy = touch.clientY - swipeY;
-    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return;
+    var dx = touch ? touch.clientX - swipeX : 0;
+    var dy = touch ? touch.clientY - swipeY : 0;
+    var horizontal = axis === "x";
+    axis = "";
+    if (!horizontal) return;
+    var items = viewerItems();
+    if (!touch || items.length < 2 || Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) {
+      placePage(0, true);
+      return;
+    }
     ignoreClick = true;
     stepViewer(dx < 0 ? 1 : -1);
   }, { passive: true });
-  nftOverlay.addEventListener("touchcancel", function () { swiping = false; }, { passive: true });
+  nftOverlay.addEventListener("touchcancel", function () {
+    if (!swiping) return;
+    swiping = false;
+    var horizontal = axis === "x";
+    axis = "";
+    if (horizontal && !nftSliding) placePage(0, true);
+  }, { passive: true });
   var dialog = document.createElement("div");
   dialog.className = "nft-dialog";
   var close = document.createElement("button");
@@ -623,7 +656,15 @@ function ensureOverlay() {
   var pager = document.createElement("div");
   pager.className = "nft-pager";
   pager.append(nftPrev, nftCount, nftNext);
-  dialog.append(close, nftStage, nftCaption, nftActions, pager);
+  var sheet = document.createElement("div");
+  sheet.className = "nft-sheet";
+  nftSheet = sheet;
+  var page = document.createElement("div");
+  page.className = "nft-page";
+  nftPage = page;
+  page.append(nftStage, nftCaption, nftActions);
+  sheet.append(page);
+  dialog.append(close, sheet, pager);
   nftOverlay.append(dialog);
   document.body.append(nftOverlay);
   document.addEventListener("keydown", function (event) {
@@ -638,13 +679,76 @@ function ensureOverlay() {
 
 function closeViewer() {
   if (nftOverlay) nftOverlay.hidden = true;
+  nftSliding = false;
+  if (nftPage) placePage(0, false);
+}
+
+function placePage(x, animate) {
+  if (!nftPage) return;
+  nftPage.classList.toggle("slide", !!animate);
+  nftPage.style.transform = "translate3d(" + x + "px,0,0)";
+}
+
+function slideViewer(delta) {
+  if (nftSliding || !nftPage) return;
+  nftSliding = true;
+  var width = Math.max((nftSheet && nftSheet.clientWidth) || 1, 1);
+  var target = delta > 0 ? -width : width;
+  var settled = false;
+  var timer = 0;
+  function commit() {
+    if (settled) return;
+    settled = true;
+    nftPage.removeEventListener("transitionend", onEnd);
+    clearTimeout(timer);
+    var items = viewerItems();
+    if (!nftOverlay || nftOverlay.hidden || items.length < 2) {
+      nftSliding = false;
+      placePage(0, false);
+      return;
+    }
+    placePage(delta > 0 ? width : -width, false);
+    viewerPos = (viewerPos + delta + items.length) % items.length;
+    paintOverlay();
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        placePage(0, true);
+        var done = false;
+        function finish() {
+          if (done) return;
+          done = true;
+          nftPage.removeEventListener("transitionend", onIn);
+          nftSliding = false;
+        }
+        function onIn(event) {
+          if (event.target !== nftPage || event.propertyName !== "transform") return;
+          finish();
+        }
+        nftPage.addEventListener("transitionend", onIn);
+        setTimeout(finish, 320);
+      });
+    });
+  }
+  function onEnd(event) {
+    if (event.target !== nftPage || event.propertyName !== "transform") return;
+    commit();
+  }
+  nftPage.addEventListener("transitionend", onEnd);
+  timer = setTimeout(commit, 320);
+  placePage(target, true);
 }
 
 function stepViewer(delta) {
   var items = viewerItems();
-  if (items.length < 2) return;
-  viewerPos = (viewerPos + delta + items.length) % items.length;
-  paintOverlay();
+  if (items.length < 2 || !delta) return;
+  if (!phone || !nftPage || nftSliding || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (nftSliding) return;
+    placePage(0, false);
+    viewerPos = (viewerPos + delta + items.length) % items.length;
+    paintOverlay();
+    return;
+  }
+  slideViewer(delta);
 }
 
 function openViewer(index) {
