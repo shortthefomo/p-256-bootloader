@@ -188,6 +188,18 @@ function walletReturn(account, place) {
   return parts.length ? `${back}#${parts.join("&")}` : back;
 }
 
+function transferPage(account) {
+  const url = new URL(location.href);
+  url.hash = "";
+  url.search = "";
+  url.searchParams.set("op", "send");
+  url.searchParams.set("account", account);
+  const back = params.get("return") || "";
+  if (back) url.searchParams.set("return", back);
+  if (params.get("logged") === "1") url.searchParams.set("logged", "1");
+  return url.href;
+}
+
 function walletReturnLink(account) {
   const next = walletReturn(account);
   if (!next) return null;
@@ -1498,11 +1510,7 @@ function sendForm(account, dest = "", amount = "") {
   rememberAccount(account);
   const body = sendBody(account, dest, amount);
   const back = walletReturnLink(account);
-  if (shell() === "phone") {
-    payScreen(account, "send", back ? [back, ...body] : body);
-    return;
-  }
-  screen(text("send"), [back, el("div", { class: "card form" }, body)].filter(Boolean));
+  payScreen(account, "send", back ? [back, ...body] : body);
 }
 
 function receiveParts(account) {
@@ -1543,11 +1551,7 @@ function receive(account) {
   rememberAccount(account);
   const parts = receiveParts(account);
   const back = walletReturnLink(account);
-  if (shell() === "phone") {
-    payScreen(account, "receive", back ? [back, ...parts] : parts);
-    return;
-  }
-  screen(text("receive"), [back, el("div", { class: "split card" }, parts)].filter(Boolean));
+  payScreen(account, "receive", back ? [back, ...parts] : parts);
 }
 
 async function listedTokens(account) {
@@ -2244,7 +2248,7 @@ function phoneScanNav(account) {
   nav.replaceChildren(...items.map(([id, place]) => {
     const label = text(id);
     if (!place) return el("button", { class: "tab on", type: "button", title: label }, [label]);
-    const href = walletReturn(account, place);
+    const href = id === "transfer" ? transferPage(account) : walletReturn(account, place);
     if (!href) return el("button", { class: "tab", type: "button", title: label }, [label]);
     return el("a", { class: "tab", href, title: label }, [label]);
   }));
@@ -2630,7 +2634,7 @@ async function main() {
     location.assign(pwaUrl(named));
     return;
   }
-  if (op === "send" || op === "activity" || (op === "nfts" && !(params.get("act") || ""))) {
+  if (op === "activity" || (op === "nfts" && !(params.get("act") || ""))) {
     const account = isAddress(named) ? named : savedAccount();
     if (!isAddress(account)) {
       home();
@@ -2638,6 +2642,15 @@ async function main() {
     }
     const place = op === "nfts" ? "nfts" : op;
     location.assign(walletReturn(account, place));
+    return;
+  }
+  if (op === "send" || op === "transfer") {
+    const account = isAddress(named) ? named : savedAccount();
+    if (!isAddress(account)) {
+      home();
+      return;
+    }
+    sendForm(account);
     return;
   }
   if (!globalThis.PublicKeyCredential && shell() === "phone" && op !== "scan" && op !== "receive" && op !== "settings" && op !== "update" && op !== "nfts") {

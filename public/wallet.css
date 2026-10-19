@@ -61,6 +61,7 @@ button, a.b {
 }
 .g, a.b.g { background: transparent; color: var(--ghost); border: 1px solid var(--ghost-border); }
 input, select {
+  display: block;
   box-sizing: border-box;
   width: 100%;
   margin: .3rem 0;
@@ -408,9 +409,6 @@ html[data-shell="desk"] #layout #transfer > .panel { display: block; margin: 0; 
 html[data-shell="desk"] #layout #transfer > #receive { border-top: 1px solid var(--line); }
 html[data-shell="desk"] #nfts .nft { background: var(--surface-2); }
 html[data-shell="desk"] #nfts .nft-art { background: var(--bg); }
-html[data-shell="desk"] #send input,
-html[data-shell="desk"] #send a.b,
-html[data-shell="desk"] #receive a.b { max-width: 28rem; }
 html[data-shell="desk"] .tx-head {
   display: grid;
   grid-template-columns: 9.5rem minmax(0, 1fr) auto;
