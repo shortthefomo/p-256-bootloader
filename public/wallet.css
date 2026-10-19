@@ -330,6 +330,7 @@ html[data-shell="phone"] #receive.on { margin-top: 1.4rem; padding-top: 0.35rem;
 .seg button { flex: 1 1 0; width: auto; margin: 0; padding: 0.55rem 0.4rem; background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 650; }
 .seg button.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .warn { color: var(--warn); }
+.danger { color: var(--danger); }
 html[data-shell="desk"] nav.menu { display: flex; flex-direction: column; gap: 0.15rem; margin-top: 1.1rem; }
 html[data-shell="desk"] nav.menu button.tab,
 html[data-shell="desk"] nav.menu a.tab { display: block; width: 100%; box-sizing: border-box; margin: 0; padding: 0.7rem 0.85rem; border: 0; border-radius: 0.7rem; background: transparent; color: var(--muted); font: inherit; font-weight: 650; text-align: left; text-decoration: none; }

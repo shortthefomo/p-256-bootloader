@@ -1,4 +1,5 @@
 import { loaderChanged, renderBootloader } from "./bootloader.mjs";
+import { checkServedPage, readDocument, refetchConditional } from "./pwa-check.mjs";
 import { decodeImage, encodeQr } from "./qr.mjs";
 import {
   currencyLabel,
@@ -785,6 +786,48 @@ function versionRows(pairs) {
   ]));
 }
 
+function pageVerdictKey(verdict) {
+  if (verdict === "ok") return "pageOk";
+  if (verdict === "stale") return "pageStale";
+  if (verdict === "tampered") return "pageTampered";
+  if (verdict === "header-mismatch") return "pageHeader";
+  if (verdict === "unbound") return "pageUnbound";
+  if (verdict === "unendorsed") return "pageUnendorsed";
+  if (verdict === "no-loader") return "pageNoLoader";
+  return "pageUnverifiable";
+}
+
+function pageVerdictClass(verdict) {
+  if (verdict === "tampered" || verdict === "header-mismatch" || verdict === "unendorsed" || verdict === "unbound") return "danger";
+  if (verdict === "ok") return "muted";
+  return "warn";
+}
+
+function servedReport(report) {
+  const verdict = report.verdict || "unverifiable";
+  const node = report.nodes?.[0] || {};
+  const nodes = [
+    el("h2", {}, [text("servedPage")]),
+    el("p", { class: pageVerdictClass(verdict) }, [text(pageVerdictKey(verdict))]),
+    versionRows([
+      [text("pageHost"), report.host || ""],
+      [text("pageBytes"), report.bytes != null ? String(report.bytes) : ""],
+      [text("pageHash"), report.hash || ""],
+      [text("pageIndex"), node.accountIndex || report.accountIndexUrl || ""],
+      [text("pageLedger"), node.ledgerIndex != null ? String(node.ledgerIndex) : ""],
+      [text("pageSequence"), node.appLoaderSequence != null ? String(node.appLoaderSequence) : ""],
+    ]),
+  ];
+  const notes = report.notes || [];
+  if (notes.length) {
+    nodes.push(el("details", { class: "raw", open: verdict !== "ok" }, [
+      el("summary", {}, [text("pageNotes")]),
+      ...notes.map((note) => el("p", { class: "muted" }, [note])),
+    ]));
+  }
+  return nodes;
+}
+
 async function installedHook(account) {
   const page = await rpc("account_objects", { account, type: "hook", ledger_index: "validated" });
   let hash = "";
@@ -1053,8 +1096,19 @@ async function paintVersion(body, account) {
     el("h2", {}, [text("walletInterface")]),
     el("p", { class: "muted" }, [text("loading")]),
   ]);
-  body.replaceChildren(hookCard, pageCard);
+  const serveCard = el("section", { class: "card" }, [
+    el("h2", {}, [text("servedPage")]),
+    el("p", { class: "muted" }, [text("loading")]),
+  ]);
+  body.replaceChildren(hookCard, pageCard, serveCard);
   const gen = viewGen;
+  const servedP = readDocument(pwaUrl(account)).then((doc) => checkServedPage({
+    href: doc.finalUrl,
+    bytes: doc.bytes,
+    headers: doc.headers,
+    rpc,
+    refetch: (previous) => refetchConditional(doc.finalUrl, previous),
+  })).catch(() => null);
   const back = safeReturn(params.get("return") || "", account) || pwaUrl(account);
   const [hook, page] = await Promise.all([
     installedHook(account).catch(() => null),
@@ -1131,6 +1185,17 @@ async function paintVersion(body, account) {
     }, [text("updateWallet")]));
   }
   pageCard.replaceChildren(...pageNodes);
+  const report = await servedP;
+  if (gen !== viewGen) return;
+  if (!report) {
+    serveCard.replaceChildren(
+      el("h2", {}, [text("servedPage")]),
+      el("p", { class: "warn" }, [text("pageUnread")]),
+      el("a", { class: "b", href: walletReturn(account, "settings") }, [text("openWallet")]),
+    );
+    return;
+  }
+  serveCard.replaceChildren(...servedReport(report));
 }
 
 function openShop(account) {

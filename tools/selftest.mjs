@@ -28,6 +28,7 @@ import { decodeImage, decodeQr, encodeQr, rasterQr } from "../src/qr.mjs";
 import { buyOfferLink, describeTx, kindFromTx, parseScan, payLink, requestLink, saleLink, samePayment, sameTransaction, shortAddress, toolLink, tweetLink, walletLink } from "../src/scan.mjs";
 import { saleQuery, visibleSale } from "../src/sale-page.mjs";
 import { AMOUNT_FORMATS, LANGUAGES, browserLanguage, canonicalAmount, formatDrops, translate } from "../src/locale.mjs";
+import { addressesFromTxt, defaultRpcs, hexIndexToDecimal, judge, parsePwaUrl, sha512Half, stripEtag } from "../src/pwa-check.mjs";
 import { EXPLORER, HOOK_HASH, HOOK_ON, INTERFACE_REV, NAMESPACE, accountBytes, explorerUrls, feeCeiling, hookLevel, levelTx, pageAccount, pwaPage, pwaUrl, safeReturn, sessionReturn, stateValue, txUrl } from "../src/wallet.mjs";
 import { createHash } from "node:crypto";
 import { generate, libraries } from "xrpl-accountlib";
@@ -254,7 +255,7 @@ check("the desktop viewer hides the page under it", walletCss.includes('html[dat
 check("the desktop nft overlay uses the window", walletCss.includes('html[data-shell="desk"] .nft-overlay .nft-page { display: grid;') && walletCss.includes("minmax(16rem, 1fr) minmax(22rem, 1fr)") && walletJs.includes('detail.className = "nft-detail"') && walletCss.includes(".nft-dialog { width: min(22rem, 100%);"));
 check("the phone viewer hides the gallery and swipes", signerHtml.includes('html[data-shell="phone"] .nft-overlay { background: #0c0f14;') && walletCss.includes('html[data-shell="phone"] .nft-overlay { background: #0c0f14;') && signerHtml.includes(".nft-grid { visibility: hidden; }") && walletCss.includes(".nft-grid { visibility: hidden; }") && signerHtml.includes('html[data-shell="phone"] .nft-grid { grid-template-columns: repeat(4, minmax(0, 1fr));') && walletCss.includes('html[data-shell="phone"] .nft-grid { grid-template-columns: repeat(4, minmax(0, 1fr));') && signerHtml.includes(".nft-filters") && walletCss.includes(".nft-filters") && signerApp.includes('"nft listed"') && walletJs.includes('"nft listed"') && translate("en", "nftAll") === "All" && translate("es", "nftOffers") === "Ofertas" && translate("de", "nftNotForSale") === "Nicht im Verkauf" && translate("ja", "nftNoMatch") === "該当なし" && translate("ko", "nftAll") === "전체" && signerHtml.includes(".nft-page.slide") && walletCss.includes(".nft-page.slide") && signerApp.includes('class: "nft-page"') && signerApp.includes("translate3d") && signerApp.includes('shell() !== "phone"') && signerApp.includes("touchstart") && walletJs.includes('className = "nft-page"') && walletJs.includes("translate3d") && walletJs.includes("if (!phone || nftSliding || event.touches.length !== 1) return") && walletJs.includes("touchstart") && walletJs.includes("stepViewer(dx < 0 ? 1 : -1)"));
 check("explorer links open in a new tab", signerApp.includes('target: "_blank"') && signerApp.includes('rel: "noopener"') && walletJs.includes('"_blank"') && walletJs.includes('"noopener"') && !walletJs.includes("links[k]"));
-check("theme defaults to dark", signerHtml.includes('getItem("p256-theme")') && signerHtml.includes('saved === "light" ? "light" : "dark"') && walletJs.includes('getItem("p256-theme")') && walletJs.startsWith("(function () {\n  var theme = \"dark\";") && !signerHtml.includes("prefers-color-scheme") && !walletCss.includes("prefers-color-scheme"));
+check("theme defaults to dark", signerHtml.includes('getItem("p256-theme")') && signerHtml.includes('saved === "light" ? "light" : "dark"') && walletJs.includes('getItem("p256-theme")') && walletJs.includes("(function () {\n  var theme = \"dark\";") && walletJs.indexOf("document.documentElement.outerHTML") < walletJs.indexOf("var theme = \"dark\";") && walletJs.indexOf("var theme = \"dark\";") < walletJs.indexOf("dataset.theme") && !signerHtml.includes("prefers-color-scheme") && !walletCss.includes("prefers-color-scheme"));
 const saleHtml = readFileSync(new URL("../public/sale.html", import.meta.url), "utf8");
 const saleSrc = readFileSync(new URL("../src/sale-page.mjs", import.meta.url), "utf8");
 const pagesSrc = readFileSync(new URL("./pages.mjs", import.meta.url), "utf8");
@@ -553,6 +554,24 @@ check("ledger activity matches the signer", ledgerFns.txLine({
   },
 }) === offerTx.line && ledgerFns.pageTxUrl(txHash) === txUrl(txHash));
 
+const pageHash = await sha512Half(new TextEncoder().encode("abc"));
+check("served page hash is sha512 half", pageHash === "DDAF35A193617ABACC417349AE20413112E6FA4E89A97EA20A9EEEE64B55D39A");
+const parsedPage = parsePwaUrl("https://pwa32666.pwa.exposed/rfMA55rjHKM4RBQyWoXnDNGRW6YJjKJa9j");
+const pageHeaders = { networkId: "21338", ledgerSeq: "10", ledgerHash: "AA", pwaSeq: "1", etag: "" };
+const pageNode = {
+  rpc: "https://node.example", hostid: "N1", networkId: 21338, valid: true, reason: "",
+  ledgerIndex: 12, appLoaderSequence: 1, domainValid: false, domainReason: "domain not endorsed by account",
+  bytesMatch: true, previousTxnId: "BB", accountIndex: "32666", headerLedgerOk: true, histMatch: null, error: "",
+};
+const pageCtx = { headers: pageHeaders, requireDomain: false, domainName: "pwa32666.pwa.exposed", urlIndex: "32666" };
+check("a matching portal page is ok", parsedPage.accountIndex === "32666" && parsedPage.zone === "pwa.exposed" && hexIndexToDecimal("7f9a") === "32666" && defaultRpcs(21339)[0] === "https://rpc.passkey.xahau-dev.net" && stripEtag('W/"AbC"') === "ABC" && addressesFromTxt(['"rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe"', '"not an address"']) === "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe" && addressesFromTxt(['"rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"']) === null && judge([pageNode], pageCtx).verdict === "ok");
+check("a served page that matches an older ledger is stale", judge([{ ...pageNode, valid: false, reason: "hash mismatch", bytesMatch: false, histMatch: true }], pageCtx).verdict === "stale");
+check("bytes that match neither copy are tampered", judge([{ ...pageNode, valid: false, reason: "hash mismatch", bytesMatch: false, histMatch: false, ledgerIndex: 10 }], { ...pageCtx, headers: { ...pageHeaders, ledgerSeq: "10" } }).verdict === "tampered");
+check("a verify node behind the served ledger is unverifiable", judge([{ ...pageNode, valid: false, reason: "hash mismatch", bytesMatch: false, ledgerIndex: 9, histMatch: null }], pageCtx).verdict === "unverifiable");
+check("a forged ledger header is a mismatch", judge([{ ...pageNode, headerLedgerOk: false }], pageCtx).verdict === "header-mismatch");
+check("a custom host without domain endorsement is unendorsed", judge([pageNode], { ...pageCtx, requireDomain: true }).verdict === "unendorsed");
+check("a host index that is not the account is tampered", judge([pageNode], { ...pageCtx, urlIndex: "1" }).verdict === "tampered");
+check("version checks the served page", walletJs.indexOf("document.documentElement.outerHTML") < walletJs.indexOf("dataset.theme") && walletJs.includes('new URL("src/pwa-check.mjs"') && walletJs.includes("checkServedPage") && signerApp.includes("checkServedPage") && signerApp.includes("readDocument") && translate("en", "servedPage") === "Served page" && translate("en", "pageOk") === "This page is the account's current document." && translate("fr", "pageTampered") === "Cette page n’est pas le document du compte." && translate("es", "pageStale") === "Esta página es una copia antigua. Recárgala." && translate("de", "pageUnread") === "Dieser Browser kann die Portalseite von hier nicht lesen." && translate("pt", "pageNotes") === "Notas da verificação" && translate("zh", "pageOk") === "此页面是该账户的当前文档。" && translate("ja", "servedPage") === "配信されたページ" && translate("ko", "pageOk") === "이 페이지는 이 계정의 현재 문서입니다." && translate("en", "pageHash") === "Hash" && translate("zh", "pageHash") === "哈希" && walletJs.includes('t("pageHash")'));
 if (failed) {
   console.log(`${failed} failed`);
   process.exit(1);
