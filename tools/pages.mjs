@@ -16,6 +16,7 @@ await cp(signer, path.join(site, "signer.html"));
 await cp(path.join(root, "public", "passkey_p256_firewall_v2.wasm"), path.join(site, "passkey_p256_firewall_v2.wasm"));
 await cp(path.join(root, "public", "wallet.css"), path.join(site, "wallet.css"));
 await cp(path.join(root, "public", "wallet.js"), path.join(site, "wallet.js"));
+await cp(path.join(root, "public", "sale.html"), path.join(site, "sale.html"));
 await cp(
   path.join(root, "node_modules", "xrpl-accountlib", "dist", "browser-class.min.js"),
   path.join(site, "vendor", "xrpl-accountlib.js"),

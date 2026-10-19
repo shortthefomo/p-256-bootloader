@@ -29,6 +29,25 @@ function tokenDrops(value, label) {
   return String(xah(text, label));
 }
 
+// A URI token offer is XAH unless a currency is named. A free XAH transfer
+// still needs a recipient. An issued currency uses the trust line's issuer.
+function saleAmount(input, label) {
+  const code = String(input.currency || "").trim();
+  const buyer = String(input.destination || "").trim();
+  if (!code || code.toUpperCase() === "XAH") {
+    if (String(input.issuer || "").trim()) throw new Error(`${label} in XAH has no issuer`);
+    const drops = tokenDrops(input.xah, label);
+    return { amount: drops, text: `${String(input.xah).trim()} XAH`, buyer };
+  }
+  const cur = currency(code);
+  const value = decimal(input.xah, label);
+  return {
+    amount: { currency: cur, issuer: address(input.issuer, `${label} issuer`), value },
+    text: `${value} ${cur}`,
+    buyer,
+  };
+}
+
 function decimal(value, label) {
   const text = String(value || "").trim();
   if (!/^\d+(\.\d{1,15})?$/.test(text) || Number(text) <= 0) throw new Error(`${label} must be a positive amount`);
@@ -200,6 +219,35 @@ export const TX_KINDS = [
     blurb: "Send the remaining balance and delete the account",
     fields: [{ key: "destination", label: "Destination", kind: "address" }],
   },
+  {
+    id: "URITokenCreateSellOffer",
+    label: "URI token offer",
+    blurb: "Offer a URI token you own. Leave the currency blank for XAH, and the buyer blank to offer it to anyone.",
+    fields: [
+      { key: "id", label: "URI token ID", kind: "hex64" },
+      { key: "xah", label: "Price", kind: "xah" },
+      { key: "currency", label: "Currency, blank for XAH", kind: "text" },
+      { key: "issuer", label: "Currency issuer, blank for XAH", kind: "text" },
+      { key: "destination", label: "Only this buyer, optional", kind: "text" },
+    ],
+  },
+  {
+    id: "URITokenCancelSellOffer",
+    label: "Cancel URI token offer",
+    blurb: "Take your URI token off sale",
+    fields: [{ key: "id", label: "URI token ID", kind: "hex64" }],
+  },
+  {
+    id: "URITokenBuy",
+    label: "Buy URI token",
+    blurb: "Buy a URI token that is already for sale. The price has to match that offer.",
+    fields: [
+      { key: "id", label: "URI token ID", kind: "hex64" },
+      { key: "xah", label: "Price", kind: "xah" },
+      { key: "currency", label: "Currency, blank for XAH", kind: "text" },
+      { key: "issuer", label: "Currency issuer, blank for XAH", kind: "text" },
+    ],
+  },
 ];
 
 export function transactionFromKind(kind, values, nowSec = Math.floor(Date.now() / 1000)) {
@@ -337,16 +385,15 @@ export function transactionFromKind(kind, values, nowSec = Math.floor(Date.now()
   }
   if (kind === "URITokenCreateSellOffer") {
     const id = hex64(input.id, "token");
-    const buyer = String(input.destination || "").trim();
-    const drops = tokenDrops(input.xah, "price");
-    if (drops === "0" && !buyer) throw new Error("a free transfer needs a recipient");
+    const priced = saleAmount(input, "price");
+    if (priced.amount === "0" && !priced.buyer) throw new Error("a free transfer needs a recipient");
     const tx = {
       TransactionType: "URITokenCreateSellOffer",
       URITokenID: id,
-      Amount: drops,
+      Amount: priced.amount,
     };
-    if (buyer) tx.Destination = address(buyer, "buyer");
-    return { summary: `Sell URI token ${id} for ${String(input.xah).trim()} XAH`, payment: null, tx };
+    if (priced.buyer) tx.Destination = address(priced.buyer, "buyer");
+    return { summary: `Sell URI token ${id} for ${priced.text}`, payment: null, tx };
   }
   if (kind === "URITokenCancelSellOffer") {
     const id = hex64(input.id, "token");
@@ -354,11 +401,12 @@ export function transactionFromKind(kind, values, nowSec = Math.floor(Date.now()
   }
   if (kind === "URITokenBuy") {
     const id = hex64(input.id, "token");
-    const drops = tokenDrops(input.xah, "price");
+    const priced = saleAmount(input, "price");
+    if (priced.amount === "0" && priced.buyer) throw new Error("a buy has no recipient");
     return {
-      summary: `Buy URI token ${id} for ${String(input.xah).trim()} XAH`,
+      summary: `Buy URI token ${id} for ${priced.text}`,
       payment: null,
-      tx: { TransactionType: "URITokenBuy", URITokenID: id, Amount: drops },
+      tx: { TransactionType: "URITokenBuy", URITokenID: id, Amount: priced.amount },
     };
   }
   throw new Error("choose a transaction type");

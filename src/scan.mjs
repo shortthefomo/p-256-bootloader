@@ -10,6 +10,38 @@ export function isAddress(value) {
   return ADDRESS.test(String(value || "").trim());
 }
 
+const SALE_ORIGIN = "https://shortthefomo.github.io";
+const SALE_PATH = "/p-256-bootloader/sale.html";
+
+// A public page. account is the owner. id, when present, is one URI token.
+export function saleLink(account, id = "") {
+  if (!isAddress(account)) return "";
+  const url = new URL(SALE_PATH, SALE_ORIGIN);
+  url.searchParams.set("account", account);
+  const token = String(id || "").trim().toUpperCase();
+  if (!token) return url.href;
+  if (!/^[0-9A-F]{64}$/.test(token)) return "";
+  url.searchParams.set("id", token);
+  return url.href;
+}
+
+export function tweetLink(page, message) {
+  const url = new URL("https://x.com/intent/tweet");
+  url.searchParams.set("text", String(message || ""));
+  url.searchParams.set("url", String(page || ""));
+  return url.href;
+}
+
+function saleFromUrl(url) {
+  if (url.protocol !== "https:" || url.hostname !== "shortthefomo.github.io") return null;
+  if (url.pathname !== SALE_PATH) return null;
+  const account = url.searchParams.get("account") || "";
+  if (!isAddress(account)) return null;
+  const id = String(url.searchParams.get("id") || "").trim().toUpperCase();
+  if (id && !/^[0-9A-F]{64}$/.test(id)) return null;
+  return { type: "sale", account, id };
+}
+
 export function shortAddress(address) {
   const text = String(address || "");
   if (text.length < 12) return text;
@@ -156,6 +188,8 @@ export function parseScan(text) {
     return { type: "unknown" };
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return { type: "unknown" };
+  const sale = saleFromUrl(url);
+  if (sale) return sale;
   const detected = detectTx(url);
   if (detected) return { type: "qr", account: "", returnTo: "", ...detected };
   const parts = url.pathname.split("/").filter(Boolean);

@@ -11,6 +11,9 @@ html[data-theme="dark"] {
   --accent-ink: #042;
   --danger: #ff8f8f;
   --warn: #ffd38a;
+  --offer: #ffd38a;
+  --offer-ink: #1a1204;
+  --offer-text: #ffd38a;
   --focus: #8dffc1;
   --ghost: #8dffc1;
   --ghost-border: #245c40;
@@ -28,6 +31,9 @@ html[data-theme="light"] {
   --accent-ink: #ffffff;
   --danger: #a32020;
   --warn: #8a5a00;
+  --offer: #f4d7a1;
+  --offer-ink: #3a2600;
+  --offer-text: #8a5a00;
   --focus: #0e7a45;
   --ghost: #0e7a45;
   --ghost-border: #8fbfa6;
@@ -127,11 +133,32 @@ details.raw pre.json { margin: 0; border: 0; border-radius: 0; border-top: 1px s
 }
 a.tx { cursor: pointer; color: inherit; text-decoration: none; }
 .nft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); gap: 0.9rem; margin: 0.4rem 0 1rem; }
-html[data-shell="phone"] .nft-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; }
-html[data-shell="phone"] .nft { border-radius: 0.7rem; }
-html[data-shell="phone"] .nft-body { padding: 0.4rem 0.45rem 0.55rem; font-size: 0.72rem; }
-html[data-shell="phone"] .nft-body p { margin: 0.1rem 0; }
-html[data-shell="phone"] .nft-badge { top: 0.3rem; left: 0.3rem; padding: 0.08rem 0.35rem; font-size: 0.62rem; }
+html[data-shell="phone"] .nft-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.35rem; }
+html[data-shell="phone"] .nft { border-radius: 0.55rem; }
+html[data-shell="phone"] .nft-body { padding: 0.22rem 0.26rem 0.28rem; font-size: 0.58rem; }
+html[data-shell="phone"] .nft-body strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-shell="phone"] .nft-body p { display: none; }
+html[data-shell="phone"] .nft-body .nft-status { display: flex; margin: 0.12rem 0 0; gap: 0.2rem; font-size: 0.6rem; }
+html[data-shell="phone"] .nft-status::before { width: 0.32rem; height: 0.32rem; }
+.nft-filterbar { display: flex; flex-direction: column; gap: 0.45rem; margin: 0.15rem 0 0.85rem; }
+.nft-filters { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.nft-filters.issuers { padding-top: 0.45rem; border-top: 1px solid var(--line); }
+.nft-filters button { display: inline-flex; align-items: center; gap: 0.35rem; width: auto; margin: 0; padding: 0.32rem 0.65rem; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-size: 0.78rem; font-weight: 650; line-height: 1.2; }
+.nft-filters button[data-kind]::before { content: ""; width: 0.42rem; height: 0.42rem; border-radius: 50%; background: var(--line); flex: none; }
+.nft-filters button[data-kind="all"]::before { background: var(--text); opacity: 0.4; }
+.nft-filters button[data-kind="offer"]::before { background: var(--offer-text); }
+.nft-filters button[data-kind="sale"]::before { background: var(--accent); }
+.nft-filters button[data-kind="held"]::before { background: var(--muted); }
+.nft-filters button.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.nft-filters button[data-kind="all"].on::before { background: var(--accent-ink); opacity: 1; }
+.nft-filters button[data-kind="offer"].on { background: var(--offer); color: var(--offer-ink); }
+.nft-filters button[data-kind="offer"].on::before { background: var(--offer-ink); }
+.nft-filters button[data-kind="sale"].on::before { background: var(--accent-ink); }
+.nft-filters button[data-kind="held"].on { background: var(--surface-2); color: var(--text); border-color: var(--muted); }
+@media (hover: hover) { .nft-filters button:not(.on):hover { background: var(--surface-2); } }
+html[data-shell="phone"] .nft-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+html[data-shell="phone"] .nft-filters::-webkit-scrollbar { display: none; }
+html[data-shell="phone"] .nft-filters button { padding: 0.28rem 0.5rem; font-size: 0.68rem; }
 .nft { position: relative; display: flex; flex-direction: column; min-width: 0; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); overflow: hidden; }
 .nft-art { display: flex; align-items: center; justify-content: center; aspect-ratio: 5 / 7; background: var(--surface-2); }
 .nft-art img { width: 100%; height: 100%; object-fit: contain; background: transparent; }
@@ -140,11 +167,22 @@ html[data-shell="phone"] .nft-badge { top: 0.3rem; left: 0.3rem; padding: 0.08re
 .nft-body strong, .nft .mono { display: block; overflow-wrap: anywhere; }
 .nft-body p { margin: 0.25rem 0; }
 .nft-sale { font-weight: 650; }
+.nft-status { display: flex; align-items: center; gap: 0.35rem; margin: 0.45rem 0 0; color: var(--muted); font-size: 0.78rem; font-weight: 700; line-height: 1.2; }
+.nft-status::before { content: ""; width: 0.45rem; height: 0.45rem; border-radius: 50%; background: currentColor; flex: none; }
+.nft-status span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nft-status .nft-pricebit { flex: none; }
+.nft-status .nft-pricebit::before { content: " · "; }
+html[data-shell="phone"] .nft-state { display: none; }
+html[data-shell="phone"] .nft-pricebit::before { content: none; }
 .nft-offer { margin: 0.25rem 0; color: var(--warn); font-weight: 700; }
-button.nft { display: flex; flex-direction: column; width: 100%; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); color: inherit; font: inherit; font-weight: 400; text-align: left; cursor: pointer; }
-button.nft strong { font-weight: 650; }
-.nft.incoming { border-color: #ffd38a; box-shadow: inset 0 0 0 1px #ffd38a; }
-.nft-badge { position: absolute; top: 0.55rem; left: 0.55rem; z-index: 1; padding: 0.18rem 0.5rem; border-radius: 999px; background: #ffd38a; color: #1a1204; font-size: 0.72rem; font-weight: 700; line-height: 1.2; pointer-events: none; }
+button.nft, a.nft { display: flex; flex-direction: column; width: 100%; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); color: inherit; font: inherit; font-weight: 400; text-align: left; text-decoration: none; cursor: pointer; }
+button.nft strong, a.nft strong { font-weight: 650; }
+.nft.incoming { box-shadow: inset 4px 0 0 var(--offer-text); }
+.nft.listed { box-shadow: inset 4px 0 0 var(--accent); }
+.nft.held { box-shadow: inset 4px 0 0 var(--muted); }
+.nft.incoming .nft-status { color: var(--offer-text); }
+.nft.listed .nft-status { color: var(--accent); }
+.nft.held .nft-status { color: var(--muted); }
 .nft-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .nft-actions a.b { width: auto; display: inline-block; margin: 0.35rem 0 0; padding: 0.45rem 0.75rem; }
 .nft-overlay { position: fixed; inset: 0; z-index: 40; display: flex; align-items: safe center; justify-content: center; box-sizing: border-box; padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)); background: rgba(6, 8, 12, 0.84); overflow: auto; }
@@ -154,16 +192,54 @@ html[data-shell="phone"] .nft-overlay { background: #0c0f14; padding: calc(0.75r
 .nft-sheet { width: 100%; overflow: hidden; }
 .nft-page { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; width: 100%; }
 .nft-page.slide { transition: transform 240ms ease; }
-.nft-stage { position: relative; width: min(20rem, 86vw); }
+.nft-stage { position: relative; width: min(20rem, 86vw); border-radius: 1.15rem; }
 html[data-shell="phone"] .nft-stage { width: 100%; }
+.nft-overlay .nft-stage.incoming { box-shadow: 0 0 0 2px #ffd38a; }
+.nft-overlay .nft-stage.listed { box-shadow: 0 0 0 2px #8dffc1; }
+.nft-overlay .nft-stage.held { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28); }
 @media (prefers-reduced-motion: reduce) { .nft-page.slide { transition: none; } }
 .nft-overlay .nft-art { width: 100%; border-radius: 1.15rem; background: transparent; }
 .nft-caption { color: #f4f7fb; text-align: center; }
 .nft-caption strong { display: block; }
 .nft-caption p { margin: 0.15rem 0; color: #d5deea; }
-.nft-caption .nft-offer { color: #ffd38a; }
+.nft-caption .nft-price { margin-top: 0.2rem; color: #f4f7fb; font-weight: 650; }
+.nft-pill { display: inline-flex; align-items: center; gap: 0.35rem; margin: 0 0 0.2rem; padding: 0.22rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; line-height: 1.2; }
+.nft-pill::before { content: ""; width: 0.4rem; height: 0.4rem; border-radius: 50%; background: currentColor; flex: none; }
+.nft-pill.offer { background: #ffd38a; color: #1a1204; }
+.nft-pill.offer::before { background: #1a1204; }
+.nft-pill.sale { background: #8dffc1; color: #042; }
+.nft-pill.sale::before { background: #042; }
+.nft-pill.held { background: transparent; color: #d5deea; border: 1px solid rgba(255, 255, 255, 0.35); }
+.nft-pill.held::before { background: #d5deea; }
 .nft-overlay-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; width: 100%; }
+.nft-overlay .nft-sell { flex-basis: 100%; width: 100%; }
+.nft-overlay .nft-sell input {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f4f7fb;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.nft-overlay .nft-sell input::placeholder { color: #93a0b5; }
 .nft-overlay-actions button, .nft-overlay-actions a.b { width: auto; margin: 0; padding: 0.7rem 1rem; }
+.nft-overlay .nft-sell a.b { width: 100%; margin: 0.35rem 0 0; }
+.nft-overlay-actions a.b.g { color: #f4f7fb; border-color: rgba(255, 255, 255, 0.35); }
+.nft-id { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 0.35rem; }
+.nft-id span { text-align: center; }
+code.nft-id-field {
+  display: block; width: 100%; box-sizing: border-box; margin: 0;
+  padding: 0.45rem 0.55rem; border-radius: 0.55rem;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  font: 0.75rem/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all; user-select: text; -webkit-user-select: text; text-align: center;
+}
+.nft-overlay .nft-id span, .nft-overlay .nft-id-field { color: #f4f7fb; }
+.nft-overlay code.nft-id-field { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.28); color: #f4f7fb; }
+.nft-id button { width: auto; align-self: center; margin: 0; padding: 0.4rem 0.8rem; }
+.nft-overlay .nft-id button { background: transparent; color: #f4f7fb; border: 1px solid rgba(255, 255, 255, 0.35); }
+a.nft-shoplink {
+  display: inline-flex; align-items: center; width: auto; margin: 0; padding: 0.32rem 0.65rem;
+  border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text);
+  font: inherit; font-size: 0.78rem; font-weight: 650; text-decoration: none;
+}
 .nft-pager { display: flex; align-items: center; justify-content: center; gap: 0.85rem; color: #f4f7fb; }
 .nft-count { margin: 0; }
 button.nft-close, button.nft-step { width: auto; margin: 0; padding: 0; background: transparent; color: #f4f7fb; border: 1px solid rgba(255, 255, 255, 0.35); font: inherit; font-weight: 650; }
@@ -355,3 +431,18 @@ html[data-shell="desk"] .tx-main { font-size: 0.95rem; color: var(--text); }
   html[data-shell="desk"] .tx-main { font-size: 0.8125rem; color: var(--muted); }
   html[data-shell="desk"] .tx-main:empty { display: none; }
 }
+html[data-shell="desk"] main.sale { max-width: 72rem; margin: 0 auto; }
+.sale-direct { width: min(28rem, 100%); margin: 0 auto; }
+.sale-direct > h1, .sale-direct > .mono { text-align: center; }
+.sale-direct .mono { overflow-wrap: anywhere; }
+.sale-one { width: min(22rem, 100%); margin: 0.4rem auto 1rem; }
+html[data-shell="phone"] main.sale .nft-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+html[data-shell="phone"] main.sale .nft { border-radius: 0.85rem; }
+html[data-shell="phone"] main.sale .nft-body { padding: 0.45rem 0.5rem 0.55rem; font-size: 0.75rem; }
+html[data-shell="phone"] main.sale .nft-state { display: inline; }
+html[data-shell="phone"] main.sale .nft-pricebit::before { content: " · "; }
+.nft-edition { display: block; margin: 0.25rem 0; color: var(--muted); font-size: 0.85rem; }
+.sale-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin: 0.4rem 0 1rem; }
+.sale-links a.b { width: auto; margin: 0; padding: 0.7rem 1rem; }
+.qrbox { display: flex; justify-content: center; margin: 0.4rem 0 0.8rem; }
+canvas.qr { width: min(16rem, 100%); height: auto; background: #fff; border-radius: 0.8rem; }

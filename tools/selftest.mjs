@@ -3,7 +3,7 @@ import { runInNewContext } from "node:vm";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { assertLoaderHtml, loaderChanged, renderBootloader } from "../src/bootloader.mjs";
-import { transactionFromKind } from "../src/tx-forms.mjs";
+import { TX_KINDS, transactionFromKind } from "../src/tx-forms.mjs";
 import { cardArt, heldOffer, incomingOffer, uriFromHex, uriToHex } from "../src/uri-tokens.mjs";
 import {
   DEVICE_FLAGS,
@@ -25,7 +25,8 @@ import {
   xahToDrops,
 } from "../src/protocol.mjs";
 import { decodeImage, decodeQr, encodeQr, rasterQr } from "../src/qr.mjs";
-import { describeTx, kindFromTx, parseScan, payLink, requestLink, samePayment, sameTransaction, shortAddress } from "../src/scan.mjs";
+import { describeTx, kindFromTx, parseScan, payLink, requestLink, saleLink, samePayment, sameTransaction, shortAddress, tweetLink } from "../src/scan.mjs";
+import { saleQuery, visibleSale } from "../src/sale-page.mjs";
 import { AMOUNT_FORMATS, LANGUAGES, canonicalAmount, formatDrops, translate } from "../src/locale.mjs";
 import { EXPLORER, HOOK_HASH, HOOK_ON, INTERFACE_REV, NAMESPACE, accountBytes, explorerUrls, feeCeiling, hookLevel, levelTx, safeReturn, stateValue, txUrl } from "../src/wallet.mjs";
 import { createHash } from "node:crypto";
@@ -147,6 +148,20 @@ const offerRow = describeTx({
 });
 const openToken = { id: offeredId.toUpperCase(), owner: seller, destination: buyer, amount: "0" };
 check("a free uri offer can be accepted", freeBuy.tx.Amount === "0" && freeSell.tx.Amount === "0" && freeSell.tx.Destination === buyer && publicFree && offerRow.tokenId === offeredId.toUpperCase() && incomingOffer(offerRow, buyer, openToken)?.xah === "0" && incomingOffer(offerRow, seller, openToken) == null && heldOffer(buyer, openToken)?.xah === "0" && heldOffer(seller, openToken) == null && translate("en", "nftAccept") === "Accept" && translate("ko", "nftDecline") === "거절" && signerApp.includes("nftAccept") && signerApp.includes('class: "nft-overlay"') && !signerApp.includes("tx-actions") && walletJs.includes("nftDecline") && walletJs.includes('className = "nft-overlay"') && walletJs.includes('act: "buy"') && translate("en", "nftCount") === "{n} of {m}" && translate("ja", "nftClose") === "閉じる");
+const kinds = TX_KINDS.map((item) => item.id);
+const iouSell = transactionFromKind("URITokenCreateSellOffer", { id: offeredId, xah: "2", currency: "USD", issuer: buyer });
+check("other transactions can offer a uri token",
+  kinds.includes("URITokenCreateSellOffer") &&
+  kinds.includes("URITokenCancelSellOffer") &&
+  kinds.includes("URITokenBuy") &&
+  !kinds.includes("URITokenMint") &&
+  transactionFromKind("URITokenCreateSellOffer", { id: offeredId, xah: "5" }).tx.Amount === "5000000" &&
+  iouSell.tx.Amount.currency === "USD" && iouSell.tx.Amount.value === "2" && iouSell.tx.Amount.issuer === buyer &&
+  !signerApp.includes("URITokenMint") &&
+  !signerApp.includes("selling = !selling") &&
+  signerApp.includes('text("nftMakeOffer")') && walletJs.includes('t("nftMakeOffer")') &&
+  walletJs.includes('act: "sell"') &&
+  translate("en", "nftMakeOffer") === "Make offer");
 check("signer checks the passkey before the seed signs", signerApp.includes("async function assertAssertion") && asserted > 0 && signerApp.indexOf("unlockSeed(account, assertion", asserted) > asserted && !signerApp.includes("sessionStorage.setItem(SEED_KEY") && !signerApp.includes("watch.any") && signerApp.includes('text("networkFee")') && translate("en", "networkFee") === "Network fee" && translate("es", "networkFee") === "Comisión de red" && translate("fr", "networkFee") === "Frais du réseau" && translate("de", "networkFee") === "Netzwerkgebühr" && translate("pt", "networkFee") === "Taxa da rede" && translate("zh", "networkFee") === "网络手续费" && translate("ja", "networkFee") === "ネットワーク手数料" && translate("ko", "networkFee") === "네트워크 수수료");
 check("signer does not hardcode the hook fee", !signerApp.includes("HOOK_FEE") && signerApp.includes("requiredFee"));
 check("live test does not hardcode the hook fee", !liveSrc.includes("HOOK_FEE"));
@@ -165,11 +180,16 @@ check("activity rows link out", signerApp.includes("explorerLinks(") && signerAp
 const signerHtml = readFileSync(new URL("../public/signer.html", import.meta.url), "utf8");
 const walletCss = readFileSync(new URL("../public/wallet.css", import.meta.url), "utf8");
 check("activity rows are not underlined", !signerHtml.includes("text-decoration-color: #8dffc1") && !walletCss.includes("text-decoration-color: #8dffc1") && !signerHtml.includes(".dash") && !signerApp.includes('class: "dash"'));
-check("incoming offers look different from held tokens", translate("en", "nftOffer") === "Offer" && translate("es", "nftOffer") === "Oferta" && translate("fr", "nftOffer") === "Offre" && translate("de", "nftOffer") === "Angebot" && translate("pt", "nftOffer") === "Oferta" && translate("zh", "nftOffer") === "报价" && translate("ja", "nftOffer") === "オファー" && translate("ko", "nftOffer") === "제안" && signerApp.includes('class: "nft-badge"') && signerApp.includes("sellBox.replaceChildren()") && !signerApp.includes("replaceChildren(!offer") && walletJs.includes('className = "nft-badge"') && walletJs.includes('nftOffer: "Offer"') && signerHtml.includes(".nft.incoming") && signerHtml.includes(".nft-badge") && walletCss.includes(".nft.incoming") && walletCss.includes(".nft-badge"));
+check("incoming offers look different from held tokens", translate("en", "nftOffer") === "Offer" && translate("es", "nftOffer") === "Oferta" && translate("fr", "nftOffer") === "Offre" && translate("de", "nftOffer") === "Angebot" && translate("pt", "nftOffer") === "Oferta" && translate("zh", "nftOffer") === "报价" && translate("ja", "nftOffer") === "オファー" && translate("ko", "nftOffer") === "제안" && signerApp.includes('class: `nft-pill ${kind}`') && signerApp.includes("sellBox.replaceChildren()") && !signerApp.includes("replaceChildren(!offer") && walletJs.includes('className = item.offer ? "nft-pill offer" : (listed ? "nft-pill sale" : "nft-pill held")') && walletJs.includes('nftOffer: "Offer"') && signerHtml.includes(".nft.incoming") && signerHtml.includes(".nft.held") && signerHtml.includes(".nft-pill.offer") && walletCss.includes(".nft.incoming") && walletCss.includes(".nft.held") && walletCss.includes(".nft-pill.sale"));
 check("desktop fills the window", signerHtml.includes("max-width: none") && walletCss.includes("max-width: none") && !signerHtml.includes("52rem") && !walletCss.includes("64rem"));
-check("the phone viewer hides the gallery and swipes", signerHtml.includes('html[data-shell="phone"] .nft-overlay { background: #0c0f14;') && walletCss.includes('html[data-shell="phone"] .nft-overlay { background: #0c0f14;') && signerHtml.includes(".nft-grid { visibility: hidden; }") && walletCss.includes(".nft-grid { visibility: hidden; }") && signerHtml.includes('html[data-shell="phone"] .nft-grid { grid-template-columns: repeat(2, minmax(0, 1fr));') && walletCss.includes('html[data-shell="phone"] .nft-grid { grid-template-columns: repeat(2, minmax(0, 1fr));') && signerHtml.includes(".nft-page.slide") && walletCss.includes(".nft-page.slide") && signerApp.includes('class: "nft-page"') && signerApp.includes("translate3d") && signerApp.includes('shell() !== "phone"') && signerApp.includes("touchstart") && walletJs.includes('className = "nft-page"') && walletJs.includes("translate3d") && walletJs.includes("if (!phone || nftSliding || event.touches.length !== 1) return") && walletJs.includes("touchstart") && walletJs.includes("stepViewer(dx < 0 ? 1 : -1)"));
+check("the phone viewer hides the gallery and swipes", signerHtml.includes('html[data-shell="phone"] .nft-overlay { background: #0c0f14;') && walletCss.includes('html[data-shell="phone"] .nft-overlay { background: #0c0f14;') && signerHtml.includes(".nft-grid { visibility: hidden; }") && walletCss.includes(".nft-grid { visibility: hidden; }") && signerHtml.includes('html[data-shell="phone"] .nft-grid { grid-template-columns: repeat(4, minmax(0, 1fr));') && walletCss.includes('html[data-shell="phone"] .nft-grid { grid-template-columns: repeat(4, minmax(0, 1fr));') && signerHtml.includes(".nft-filters") && walletCss.includes(".nft-filters") && signerApp.includes('"nft listed"') && walletJs.includes('"nft listed"') && translate("en", "nftAll") === "All" && translate("es", "nftOffers") === "Ofertas" && translate("de", "nftNotForSale") === "Nicht im Verkauf" && translate("ja", "nftNoMatch") === "該当なし" && translate("ko", "nftAll") === "전체" && signerHtml.includes(".nft-page.slide") && walletCss.includes(".nft-page.slide") && signerApp.includes('class: "nft-page"') && signerApp.includes("translate3d") && signerApp.includes('shell() !== "phone"') && signerApp.includes("touchstart") && walletJs.includes('className = "nft-page"') && walletJs.includes("translate3d") && walletJs.includes("if (!phone || nftSliding || event.touches.length !== 1) return") && walletJs.includes("touchstart") && walletJs.includes("stepViewer(dx < 0 ? 1 : -1)"));
 check("explorer links open in a new tab", signerApp.includes('target: "_blank"') && signerApp.includes('rel: "noopener"') && walletJs.includes('"_blank"') && walletJs.includes('"noopener"') && !walletJs.includes("links[k]"));
 check("theme defaults to dark", signerHtml.includes('getItem("p256-theme")') && signerHtml.includes('saved === "light" ? "light" : "dark"') && walletJs.includes('getItem("p256-theme")') && walletJs.startsWith("(function () {\n  var theme = \"dark\";") && !signerHtml.includes("prefers-color-scheme") && !walletCss.includes("prefers-color-scheme"));
+const saleHtml = readFileSync(new URL("../public/sale.html", import.meta.url), "utf8");
+const saleSrc = readFileSync(new URL("../src/sale-page.mjs", import.meta.url), "utf8");
+const pagesSrc = readFileSync(new URL("./pages.mjs", import.meta.url), "utf8");
+check("token id can be copied and shared", signerHtml.includes("code.nft-id-field") && walletCss.includes("code.nft-id-field") && signerHtml.includes("a.nft-shoplink") && walletCss.includes("a.nft-shoplink") && signerApp.includes('class: "nft-id-field"') && signerApp.includes("tweetLink") && walletJs.includes("https://shortthefomo.github.io/p-256-bootloader/sale.html") && walletJs.includes('className = "nft-id-field"') && walletJs.includes('rel = "noopener"') && walletCss.includes("canvas.qr") && walletCss.includes("a.nft"));
+check("public sale page stays off the signer", pagesSrc.includes('path.join(root, "public", "sale.html")') && saleHtml.includes('src="src/sale-page.mjs"') && saleHtml.includes("wallet.css") && !saleHtml.includes("prefers-color-scheme") && saleSrc.includes("wss://passkey.xahau-dev.net") && !saleSrc.includes("rpc.passkey.xahau-dev.net") && saleSrc.includes("encodeQr(") && saleSrc.includes("saleLink(") && saleSrc.includes("cardArt(") && !saleSrc.includes("wallet.mjs") && !saleSrc.includes("location.href") && !saleSrc.includes("location.assign"));
 check("same-tab wallet links stay on this tab", !walletJs.slice(walletJs.indexOf("function href("), walletJs.indexOf("function showNote(")).includes("_blank"));
 
 let firewall = null;
@@ -346,6 +366,21 @@ const parsedDetect = parseScan(detect);
 check("scan reads a xaman detect payment", parsedDetect.kind === "Payment" && parsedDetect.values.xah === "2.5");
 check("xaman payload is not fetched", parseScan("https://xumm.app/sign/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee").type === "xaman-payload");
 check("scan ignores another site", parseScan("https://evil.example/steal").type === "unknown");
+const saleId = "A".repeat(64);
+const saleOne = saleLink(account, saleId);
+const saleShop = saleLink(account);
+const parsedSale = parseScan(saleOne);
+check("scan reads a sale page", parsedSale.type === "sale" && parsedSale.account === account && parsedSale.id === saleId && parseScan(saleShop).type === "sale" && parseScan(saleShop).id === "" && !saleShop.includes("id="));
+check("sale link rejects a bad id", saleLink(account, "zz") === "" && saleLink("not-an-account") === "" && parseScan(`https://shortthefomo.github.io/p-256-bootloader/sale.html?account=${account}&id=zz`).type === "unknown" && parseScan(saleOne.replace("https:", "http:")).type === "unknown");
+check("sale link ignores another site", parseScan(`https://evil.example/p-256-bootloader/sale.html?account=${account}`).type === "unknown" && parseScan(`https://evil.example/sale.html?account=${account}`).type === "unknown" && parseScan(`https://shortthefomo.github.io/p-256-bootloader/?account=${account}`).type !== "sale");
+const tweet = tweetLink(saleOne, "For sale on Xahau");
+check("share opens a tweet", tweet.startsWith("https://x.com/intent/tweet?") && new URL(tweet).searchParams.get("url") === saleOne && new URL(tweet).searchParams.get("text") === "For sale on Xahau");
+const heldToken = { id: "B".repeat(64), amount: "" };
+const listedToken = { id: saleId, amount: "1000000" };
+const freeToken = { id: "C".repeat(64), amount: "0" };
+const shopTokens = visibleSale([heldToken, listedToken, freeToken], "");
+check("sale shop keeps listed tokens", shopTokens.length === 2 && shopTokens[0].id === saleId && shopTokens[1].amount === "0" && visibleSale([heldToken, listedToken], saleId).length === 1 && visibleSale([heldToken, listedToken], heldToken.id)[0].amount === "" && visibleSale([listedToken], "D".repeat(64)).length === 0);
+check("sale query keeps a shop or one token", saleQuery(`?account=${account}`)?.id === "" && saleQuery(`?account=${account}&id=${saleId}`)?.id === saleId && saleQuery(`?account=${account}&id=zz`) == null && saleQuery("?account=nope") == null);
 check("kind from trustset", kindFromTx({ TransactionType: "TrustSet", LimitAmount: { currency: "USD", issuer: account, value: "5" } })?.kind === "TrustSet");
 check("payment watch matches drops", samePayment(
   { ok: true, hash: "abc", type: "Payment", destination: account, amount: "1500000" },

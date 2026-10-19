@@ -7,8 +7,10 @@ import {
   parseScan,
   payLink,
   requestLink,
+  saleLink,
   sameTransaction,
   shortAddress,
+  tweetLink,
 } from "./scan.mjs";
 import { TX_KINDS, transactionFromKind } from "./tx-forms.mjs";
 import { heldOffer, incomingOffer, normalizeUriToken } from "./uri-tokens.mjs";
@@ -1087,6 +1089,37 @@ function qrCanvas(text) {
   return canvas;
 }
 
+function tokenIdBlock(id) {
+  const field = el("code", { class: "nft-id-field" }, [id]);
+  const button = el("button", { class: "ghost", type: "button" }, [text("nftCopy")]);
+  button.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(id);
+      button.textContent = text("nftCopied");
+    } catch {
+      const range = document.createRange();
+      range.selectNodeContents(field);
+      const selection = getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  });
+  return el("div", { class: "nft-id" }, [
+    el("span", {}, [text("nftTokenId")]),
+    field,
+    button,
+  ]);
+}
+
+function shareAnchor(page, label, message) {
+  return el("a", {
+    class: "ghost",
+    href: tweetLink(page, message),
+    target: "_blank",
+    rel: "noopener",
+  }, [label]);
+}
+
 function copyButton(text) {
   return el("button", {
     class: "ghost",
@@ -1512,18 +1545,26 @@ function signToken(account, kind, values) {
 function plainPrice(value) {
   const typed = String(value || "");
   if (!typed.trim()) return "";
-  const plain = canonicalAmount(typed);
+  const plain = canonicalAmount(typed, amountFormat());
   if (!plain) throw new Error(text("amountInvalid"));
   return plain;
+}
+
+// A named buyer can take a token for 0 XAH. canonicalAmount rejects that.
+function offerPrice(value) {
+  const typed = String(value || "").trim();
+  if (!typed) return "";
+  if (/^0+([.,]0+)?$/.test(typed)) return "0";
+  return plainPrice(typed);
 }
 
 function sellFields(account, id) {
   const price = el("input", { type: "text", placeholder: text("nftPrice"), inputMode: "decimal", autocomplete: "off" });
   const buyer = el("input", { type: "text", placeholder: text("nftBuyer"), autocomplete: "off", spellcheck: "false" });
-  const go = el("button", { type: "button" }, [text("nftSell")]);
+  const go = el("button", { type: "button" }, [text("nftMakeOffer")]);
   go.addEventListener("click", () => {
     try {
-      const values = { id, xah: plainPrice(price.value) };
+      const values = { id, xah: offerPrice(price.value) };
       if (!values.xah) throw new Error(text("amountInvalid"));
       if (buyer.value.trim()) values.destination = buyer.value.trim();
       signToken(account, "URITokenCreateSellOffer", values);
@@ -1564,25 +1605,38 @@ function collectItems(account, tokens, offers) {
   return items;
 }
 
+function tokenListed(token) {
+  return token?.amount != null && token.amount !== "";
+}
+
 function galleryCard(item, onOpen) {
   const title = tokenTitle(item.token);
   const sale = priceLabel(item.token.amount);
-  const card = el("button", { class: item.offer ? "nft incoming" : "nft", type: "button", onclick: onOpen }, [
+  const listed = !item.offer && tokenListed(item.token);
+  const label = item.offer ? text("nftOffer") : (listed ? text("nftForSale") : text("nftNotForSale"));
+  return el("button", {
+    class: item.offer ? "nft incoming" : (listed ? "nft listed" : "nft held"),
+    type: "button",
+    onclick: onOpen,
+  }, [
     tokenArt(item.token, title),
     el("div", { class: "nft-body" }, [
       el("strong", {}, [title]),
       item.token.edition ? el("p", { class: "muted" }, [`${text("nftEdition")} ${item.token.edition}`]) : null,
-      sale ? el("p", { class: "nft-sale" }, [`${text("nftForSale")} ${sale}`]) : null,
+      el("p", { class: "nft-status" }, [
+        el("span", { class: "nft-state" }, [label]),
+        sale && (item.offer || listed) ? el("span", { class: "nft-pricebit" }, [sale]) : null,
+      ]),
     ]),
   ]);
-  if (item.offer) card.append(el("span", { class: "nft-badge" }, [text("nftOffer")]));
-  return card;
 }
 
 function showNftBrowser(account, items, focus) {
   let index = focus.openIndex >= 0 ? focus.openIndex : 0;
-  let selling = Boolean(focus.sell);
+  let mode = "all";
+  let issuer = "";
   const note = el("p", { class: "muted" }, [items.length ? "" : text("nftEmpty")]);
+  const filters = el("div", { class: "nft-filterbar" });
   const grid = el("div", { class: "nft-grid" });
   const stage = el("div", { class: "nft-stage" });
   const caption = el("div", { class: "nft-caption" });
@@ -1678,7 +1732,8 @@ function showNftBrowser(account, items, focus) {
   }
 
   function slide(dir) {
-    if (sliding || items.length < 2) return;
+    const dest = destIndex(dir);
+    if (sliding || dest < 0) return;
     sliding = true;
     const width = Math.max(sheet.clientWidth || 1, 1);
     const target = dir > 0 ? -width : width;
@@ -1695,7 +1750,7 @@ function showNftBrowser(account, items, focus) {
         return;
       }
       place(dir > 0 ? width : -width, false);
-      openAt(index + dir, false);
+      openAt(dest);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           place(0, true);
@@ -1725,9 +1780,14 @@ function showNftBrowser(account, items, focus) {
   }
 
   function turn(dir) {
-    if (!motion() || items.length < 2) {
+    const dest = destIndex(dir);
+    if (dest < 0) {
+      place(0, true);
+      return;
+    }
+    if (!motion()) {
       place(0, false);
-      openAt(index + dir, false);
+      openAt(dest);
     } else slide(dir);
   }
 
@@ -1737,18 +1797,77 @@ function showNftBrowser(account, items, focus) {
     place(0, false);
   }
 
-  function rebuildGrid() {
-    note.textContent = items.length ? "" : text("nftEmpty");
-    grid.replaceChildren(...items.map((item, at) => galleryCard(item, () => openAt(at, false))));
+  function visibleItems() {
+    return items.filter((item) => {
+      if (issuer && item.token.issuer !== issuer) return false;
+      if (mode === "offer") return Boolean(item.offer);
+      if (mode === "sale") return !item.offer && tokenListed(item.token);
+      if (mode === "held") return !item.offer && !tokenListed(item.token);
+      return true;
+    });
   }
 
-  function openAt(at, keepSell) {
+  function destIndex(dir) {
+    const list = visibleItems();
+    if (list.length < 2) return -1;
+    const at = list.indexOf(items[index]);
+    const next = list[(Math.max(at, 0) + dir + list.length) % list.length];
+    return items.indexOf(next);
+  }
+
+  function chip(label, on, pick, kind) {
+    const attrs = { class: on ? "on" : "", type: "button", onclick: pick };
+    if (kind) attrs["data-kind"] = kind;
+    return el("button", attrs, [label]);
+  }
+
+  function paintFilters() {
+    filters.hidden = !items.length;
+    const status = el("div", { class: "nft-filters" }, [
+      chip(text("nftAll"), mode === "all", () => { mode = "all"; rebuildGrid(); }, "all"),
+      chip(text("nftOffers"), mode === "offer", () => { mode = "offer"; rebuildGrid(); }, "offer"),
+      chip(text("nftForSale"), mode === "sale", () => { mode = "sale"; rebuildGrid(); }, "sale"),
+      chip(text("nftNotForSale"), mode === "held", () => { mode = "held"; rebuildGrid(); }, "held"),
+    ]);
+    const seen = [];
+    for (const item of items) {
+      if (item.token.issuer && !seen.includes(item.token.issuer)) seen.push(item.token.issuer);
+    }
+    const issuerRow = seen.length > 1
+      ? el("div", { class: "nft-filters issuers" }, [
+        chip(text("nftAll"), issuer === "", () => { issuer = ""; rebuildGrid(); }),
+        ...seen.map((id) => chip(shortAddress(id), issuer === id, () => { issuer = id; rebuildGrid(); })),
+      ])
+      : null;
+    filters.replaceChildren(status);
+    if (issuerRow) filters.append(issuerRow);
+    const shop = saleLink(account);
+    const selling = items.some((item) => !item.offer && tokenListed(item.token));
+    if (shop && selling) {
+      filters.append(el("a", {
+        class: "nft-shoplink",
+        href: tweetLink(shop, text("nftTweet")),
+        target: "_blank",
+        rel: "noopener",
+      }, [text("nftShareShop")]));
+    }
+  }
+
+  function rebuildGrid() {
+    const list = visibleItems();
+    note.textContent = items.length ? (list.length ? "" : text("nftNoMatch")) : text("nftEmpty");
+    paintFilters();
+    grid.replaceChildren(...list.map((item) => galleryCard(item, () => openAt(items.indexOf(item)))));
+    if (!overlay.hidden && list.length && !list.includes(items[index])) openAt(items.indexOf(list[0]));
+    else if (!overlay.hidden && !list.length) closeOverlay();
+  }
+
+  function openAt(at) {
     if (!items.length) {
       closeOverlay();
       return;
     }
     index = (at + items.length) % items.length;
-    if (!keepSell) selling = false;
     paint();
     overlay.hidden = false;
   }
@@ -1762,13 +1881,18 @@ function showNftBrowser(account, items, focus) {
     const { token, offer } = item;
     const title = tokenTitle(token);
     const sale = priceLabel(token.amount);
+    const listed = !offer && tokenListed(token);
+    const kind = offer ? "offer" : (listed ? "sale" : "held");
+    stage.className = `nft-stage ${offer ? "incoming" : (listed ? "listed" : "held")}`;
     stage.replaceChildren(tokenArt(token, title));
-    if (offer) stage.append(el("span", { class: "nft-badge" }, [text("nftOffer")]));
-    const lines = [el("strong", {}, [title])];
-    if (offer) lines.push(el("p", { class: "nft-offer" }, [text("nftOffer")]));
+    const lines = [
+      el("span", { class: `nft-pill ${kind}` }, [offer ? text("nftOffer") : (listed ? text("nftForSale") : text("nftNotForSale"))]),
+      el("strong", {}, [title]),
+    ];
     if (token.edition) lines.push(el("p", {}, [`${text("nftEdition")} ${token.edition}`]));
-    if (sale) lines.push(el("p", {}, [`${text("nftForSale")} ${sale}`]));
+    if (sale && (offer || listed)) lines.push(el("p", { class: "nft-price" }, [sale]));
     if (token.destination) lines.push(el("p", {}, [shortAddress(token.destination)]));
+    if (token.id) lines.push(tokenIdBlock(token.id));
     caption.replaceChildren(...lines);
     const controls = [];
     if (offer) {
@@ -1782,7 +1906,6 @@ function showNftBrowser(account, items, focus) {
         onclick: () => {
           declineOffer(offer.key);
           items.splice(index, 1);
-          selling = false;
           rebuildGrid();
           if (!items.length) closeOverlay();
           else {
@@ -1800,29 +1923,29 @@ function showNftBrowser(account, items, focus) {
         }, [text("nftCancelSale")]));
       }
       controls.push(el("button", {
-        type: "button",
-        onclick: () => {
-          selling = !selling;
-          paint();
-        },
-      }, [text("nftSell")]));
-      controls.push(el("button", {
         class: "ghost",
         type: "button",
         onclick: () => signToken(account, "URITokenBurn", { id: token.id }),
       }, [text("nftBurn")]));
     }
+    const page = saleLink(token.owner || account, token.id);
+    if (page) {
+      const message = listed || offer ? `${title} · ${text("nftTweet")}` : title;
+      controls.push(shareAnchor(page, text("nftShare"), message));
+    }
     actions.replaceChildren(...controls);
-    if (!offer && selling) {
+    if (!offer) {
       sellBox.hidden = false;
       sellBox.replaceChildren(sellFields(account, token.id));
     } else {
       sellBox.replaceChildren();
       sellBox.hidden = true;
     }
-    count.textContent = text("nftCount", { n: index + 1, m: items.length });
-    prev.disabled = items.length < 2;
-    next.disabled = items.length < 2;
+    const list = visibleItems();
+    const at = list.indexOf(item);
+    count.textContent = text("nftCount", { n: at < 0 ? 1 : at + 1, m: Math.max(list.length, 1) });
+    prev.disabled = list.length < 2;
+    next.disabled = list.length < 2;
   }
 
   prev.addEventListener("click", () => turn(-1));
@@ -1833,7 +1956,7 @@ function showNftBrowser(account, items, focus) {
     paint();
     overlay.hidden = false;
   }
-  screen(text("nfts"), [note, grid, overlay], "nfts");
+  screen(text("nfts"), [filters, note, grid, overlay], "nfts");
   const live = viewGen;
   const onKey = (event) => {
     if (live !== viewGen) {
@@ -1885,8 +2008,7 @@ async function uriTokens(account, focus = {}) {
       }
     }
     if (gen !== viewGen) return;
-    const selling = focus.act === "sell" && openIndex >= 0 && !items[openIndex].offer;
-    showNftBrowser(account, items, { openIndex, sell: selling });
+    showNftBrowser(account, items, { openIndex });
   } catch {
     if (gen !== viewGen) return;
     screen(text("nfts"), [el("p", {}, [text("nftUnavailable")])], "nfts");
@@ -2027,6 +2149,24 @@ function openScanned(text) {
       values: found.values,
       back: account ? safeReturn(found.returnTo, account) : null,
     }).catch((error) => fail(error));
+    return;
+  }
+  if (found.type === "sale") {
+    const page = saleLink(found.account, found.id);
+    let same = false;
+    try {
+      same = Boolean(page) && new URL(page).origin === location.origin;
+    } catch {
+      same = false;
+    }
+    if (same) {
+      location.assign(page);
+      return;
+    }
+    screen(text("nfts"), [
+      el("p", {}, [text("nftScan")]),
+      page ? el("a", { href: page, target: "_blank", rel: "noopener" }, [text("nftShare")]) : null,
+    ], savedAccount() ? "nfts" : "");
     return;
   }
   if (found.type === "sign") {
@@ -2444,6 +2584,13 @@ async function main() {
           values: { id, xah },
           back,
         }).catch((error) => rejected(account, back, error));
+        return;
+      }
+      if (act === "sell" && id && params.get("xah")) {
+        const destination = (params.get("destination") || "").trim();
+        const values = { id, xah: params.get("xah") };
+        if (destination) values.destination = destination;
+        openBuilt({ account, kind: "URITokenCreateSellOffer", values, back }).catch((error) => rejected(account, back, error));
         return;
       }
       await uriTokens(account, { act, id });

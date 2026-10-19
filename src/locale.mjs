@@ -97,6 +97,7 @@ const en = {
   nftBuyer: "Only this buyer, optional",
   nftBurn: "Burn",
   nftSell: "Sell",
+  nftMakeOffer: "Make offer",
   nftCancelSale: "Cancel sale",
   nftBuy: "Buy a listed token",
   nftTokenId: "Token ID",
@@ -108,6 +109,20 @@ const en = {
   nftOffer: "Offer",
   nftClose: "Close",
   nftCount: "{n} of {m}",
+  nftAll: "All",
+  nftOffers: "Offers",
+  nftNotForSale: "Not for sale",
+  nftNoMatch: "Nothing matches.",
+  nftCopy: "Copy",
+  nftCopied: "Copied",
+  nftShare: "Share",
+  nftShareShop: "Share for sale",
+  nftTweet: "For sale on Xahau",
+  nftShop: "All for sale",
+  nftShopEmpty: "Nothing is listed for sale.",
+  nftMissing: "That token is not on this account.",
+  nftScan: "Scan this code to open the page.",
+  nftBadLink: "This link is not a sale page.",
 };
 
 const CATALOG = {
@@ -133,7 +148,7 @@ const CATALOG = {
     receiveHint: "Deja la cantidad vacía y el código es tu dirección.",
     scanHint: "Encaja el código en el marco. Toca la imagen si se ve borrosa.",
     pastePlaceholder: "O pega un enlace o una dirección", open: "Abrir", emptyActivity: "Todavía no hay transacciones.",
-    type: "Tipo", detail: "Detalle", hash: "Hash", drops: "drops", amountInvalid: "Escribe una cantidad con 6 decimales como máximo.", nfts: "NFTs", nftEmpty: "No hay URI tokens en esta cuenta.", nftMint: "Acuñar un URI token", nftUri: "URI, por ejemplo xahaucards://…", nftBurnable: "El emisor puede quemarlo", nftPrice: "Precio en XAH, opcional", nftBuyer: "Solo este comprador, opcional", nftBurn: "Quemar", nftSell: "Vender", nftCancelSale: "Cancelar la venta", nftBuy: "Comprar un token en venta", nftTokenId: "ID del token", nftForSale: "En venta", nftEdition: "Edición", nftUnavailable: "Los URI tokens no están disponibles.", nftAccept: "Aceptar", nftDecline: "Rechazar", nftOffer: "Oferta", nftClose: "Cerrar", nftCount: "{n} de {m}",
+    type: "Tipo", detail: "Detalle", hash: "Hash", drops: "drops", amountInvalid: "Escribe una cantidad con 6 decimales como máximo.", nfts: "NFTs", nftEmpty: "No hay URI tokens en esta cuenta.", nftMint: "Acuñar un URI token", nftUri: "URI, por ejemplo xahaucards://…", nftBurnable: "El emisor puede quemarlo", nftPrice: "Precio en XAH, opcional", nftBuyer: "Solo este comprador, opcional", nftBurn: "Quemar", nftSell: "Vender", nftMakeOffer: "Hacer una oferta", nftCancelSale: "Cancelar la venta", nftBuy: "Comprar un token en venta", nftTokenId: "ID del token", nftForSale: "En venta", nftEdition: "Edición", nftUnavailable: "Los URI tokens no están disponibles.", nftAccept: "Aceptar", nftDecline: "Rechazar", nftOffer: "Oferta", nftClose: "Cerrar", nftCount: "{n} de {m}", nftAll: "Todos", nftOffers: "Ofertas", nftNotForSale: "Sin venta", nftNoMatch: "Nada coincide.", nftCopy: "Copiar", nftCopied: "Copiado", nftShare: "Compartir", nftShareShop: "Compartir en venta", nftTweet: "En venta en Xahau", nftShop: "Todo en venta", nftShopEmpty: "Nada está en venta.", nftMissing: "Ese token no está en esta cuenta.", nftScan: "Escanea este código para abrir la página.", nftBadLink: "Este enlace no es una página de venta.",
   },
   fr: {
     home: "Accueil", send: "Envoyer", scan: "Scanner", receive: "Recevoir", transfer: "Transfert", activity: "Activité", settings: "Réglages",
@@ -156,7 +171,7 @@ const CATALOG = {
     receiveHint: "Laissez le montant vide et le code est votre adresse.",
     scanHint: "Placez le code dans le cadre. Touchez l’image s’il reste flou.",
     pastePlaceholder: "Ou collez un lien ou une adresse", open: "Ouvrir", emptyActivity: "Aucune transaction pour le moment.",
-    type: "Type", detail: "Détail", hash: "Hash", drops: "drops", amountInvalid: "Saisissez un montant avec au plus 6 décimales.", nfts: "NFTs", nftEmpty: "Aucun URI token sur ce compte.", nftMint: "Émettre un URI token", nftUri: "URI, par exemple xahaucards://…", nftBurnable: "L’émetteur peut le détruire", nftPrice: "Prix en XAH, facultatif", nftBuyer: "Seulement cet acheteur, facultatif", nftBurn: "Détruire", nftSell: "Vendre", nftCancelSale: "Annuler la vente", nftBuy: "Acheter un token en vente", nftTokenId: "ID du token", nftForSale: "En vente", nftEdition: "Édition", nftUnavailable: "Les URI tokens ne sont pas disponibles.", nftAccept: "Accepter", nftDecline: "Refuser", nftOffer: "Offre", nftClose: "Fermer", nftCount: "{n} sur {m}",
+    type: "Type", detail: "Détail", hash: "Hash", drops: "drops", amountInvalid: "Saisissez un montant avec au plus 6 décimales.", nfts: "NFTs", nftEmpty: "Aucun URI token sur ce compte.", nftMint: "Émettre un URI token", nftUri: "URI, par exemple xahaucards://…", nftBurnable: "L’émetteur peut le détruire", nftPrice: "Prix en XAH, facultatif", nftBuyer: "Seulement cet acheteur, facultatif", nftBurn: "Détruire", nftSell: "Vendre", nftMakeOffer: "Faire une offre", nftCancelSale: "Annuler la vente", nftBuy: "Acheter un token en vente", nftTokenId: "ID du token", nftForSale: "En vente", nftEdition: "Édition", nftUnavailable: "Les URI tokens ne sont pas disponibles.", nftAccept: "Accepter", nftDecline: "Refuser", nftOffer: "Offre", nftClose: "Fermer", nftCount: "{n} sur {m}", nftAll: "Tous", nftOffers: "Offres", nftNotForSale: "Pas en vente", nftNoMatch: "Aucun résultat.", nftCopy: "Copier", nftCopied: "Copié", nftShare: "Partager", nftShareShop: "Partager en vente", nftTweet: "En vente sur Xahau", nftShop: "Tout en vente", nftShopEmpty: "Rien n’est en vente.", nftMissing: "Ce token n’est pas sur ce compte.", nftScan: "Scannez ce code pour ouvrir la page.", nftBadLink: "Ce lien n’est pas une page de vente.",
   },
   de: {
     home: "Start", send: "Senden", scan: "Scannen", receive: "Empfangen", transfer: "Transfer", activity: "Aktivität", settings: "Einstellungen",
@@ -179,7 +194,7 @@ const CATALOG = {
     receiveHint: "Ohne Betrag ist der Code deine Adresse.",
     scanHint: "Halte den Code ins Feld. Tippe auf das Bild, wenn es unscharf bleibt.",
     pastePlaceholder: "Oder Link oder Adresse einfügen", open: "Öffnen", emptyActivity: "Noch keine Transaktionen.",
-    type: "Typ", detail: "Detail", hash: "Hash", drops: "drops", amountInvalid: "Gib einen Betrag mit höchstens 6 Nachkommastellen ein.", nfts: "NFTs", nftEmpty: "Keine URI-Tokens auf diesem Konto.", nftMint: "URI-Token prägen", nftUri: "URI, zum Beispiel xahaucards://…", nftBurnable: "Der Aussteller darf es vernichten", nftPrice: "Preis in XAH, optional", nftBuyer: "Nur dieser Käufer, optional", nftBurn: "Vernichten", nftSell: "Verkaufen", nftCancelSale: "Verkauf abbrechen", nftBuy: "Angebotenes Token kaufen", nftTokenId: "Token-ID", nftForSale: "Zu verkaufen", nftEdition: "Ausgabe", nftUnavailable: "URI-Tokens sind nicht verfügbar.", nftAccept: "Annehmen", nftDecline: "Ablehnen", nftOffer: "Angebot", nftClose: "Schließen", nftCount: "{n} von {m}",
+    type: "Typ", detail: "Detail", hash: "Hash", drops: "drops", amountInvalid: "Gib einen Betrag mit höchstens 6 Nachkommastellen ein.", nfts: "NFTs", nftEmpty: "Keine URI-Tokens auf diesem Konto.", nftMint: "URI-Token prägen", nftUri: "URI, zum Beispiel xahaucards://…", nftBurnable: "Der Aussteller darf es vernichten", nftPrice: "Preis in XAH, optional", nftBuyer: "Nur dieser Käufer, optional", nftBurn: "Vernichten", nftSell: "Verkaufen", nftMakeOffer: "Angebot machen", nftCancelSale: "Verkauf abbrechen", nftBuy: "Angebotenes Token kaufen", nftTokenId: "Token-ID", nftForSale: "Zu verkaufen", nftEdition: "Ausgabe", nftUnavailable: "URI-Tokens sind nicht verfügbar.", nftAccept: "Annehmen", nftDecline: "Ablehnen", nftOffer: "Angebot", nftClose: "Schließen", nftCount: "{n} von {m}", nftAll: "Alle", nftOffers: "Angebote", nftNotForSale: "Nicht im Verkauf", nftNoMatch: "Nichts passt.", nftCopy: "Kopieren", nftCopied: "Kopiert", nftShare: "Teilen", nftShareShop: "Verkauf teilen", nftTweet: "Zu verkaufen auf Xahau", nftShop: "Alles im Verkauf", nftShopEmpty: "Nichts steht zum Verkauf.", nftMissing: "Dieses Token ist nicht auf diesem Konto.", nftScan: "Scanne diesen Code, um die Seite zu öffnen.", nftBadLink: "Dieser Link ist keine Verkaufsseite.",
   },
   pt: {
     home: "Início", send: "Enviar", scan: "Ler", receive: "Receber", transfer: "Mover", activity: "Atividade", settings: "Ajustes",
@@ -202,7 +217,7 @@ const CATALOG = {
     receiveHint: "Deixe o valor vazio e o código é o seu endereço.",
     scanHint: "Encaixe o código na moldura. Toque na imagem se ficar desfocada.",
     pastePlaceholder: "Ou cole um link ou um endereço", open: "Abrir", emptyActivity: "Ainda não há transações.",
-    type: "Tipo", detail: "Detalhe", hash: "Hash", drops: "drops", amountInvalid: "Digite um valor com no máximo 6 casas decimais.", nfts: "NFTs", nftEmpty: "Não há URI tokens nesta conta.", nftMint: "Emitir um URI token", nftUri: "URI, por exemplo xahaucards://…", nftBurnable: "O emissor pode queimar", nftPrice: "Preço em XAH, opcional", nftBuyer: "Só este comprador, opcional", nftBurn: "Queimar", nftSell: "Vender", nftCancelSale: "Cancelar a venda", nftBuy: "Comprar um token à venda", nftTokenId: "ID do token", nftForSale: "À venda", nftEdition: "Edição", nftUnavailable: "Os URI tokens não estão disponíveis.", nftAccept: "Aceitar", nftDecline: "Recusar", nftOffer: "Oferta", nftClose: "Fechar", nftCount: "{n} de {m}",
+    type: "Tipo", detail: "Detalhe", hash: "Hash", drops: "drops", amountInvalid: "Digite um valor com no máximo 6 casas decimais.", nfts: "NFTs", nftEmpty: "Não há URI tokens nesta conta.", nftMint: "Emitir um URI token", nftUri: "URI, por exemplo xahaucards://…", nftBurnable: "O emissor pode queimar", nftPrice: "Preço em XAH, opcional", nftBuyer: "Só este comprador, opcional", nftBurn: "Queimar", nftSell: "Vender", nftMakeOffer: "Fazer uma oferta", nftCancelSale: "Cancelar a venda", nftBuy: "Comprar um token à venda", nftTokenId: "ID do token", nftForSale: "À venda", nftEdition: "Edição", nftUnavailable: "Os URI tokens não estão disponíveis.", nftAccept: "Aceitar", nftDecline: "Recusar", nftOffer: "Oferta", nftClose: "Fechar", nftCount: "{n} de {m}", nftAll: "Todos", nftOffers: "Ofertas", nftNotForSale: "Sem venda", nftNoMatch: "Nada encontrado.", nftCopy: "Copiar", nftCopied: "Copiado", nftShare: "Compartilhar", nftShareShop: "Compartilhar à venda", nftTweet: "À venda na Xahau", nftShop: "Tudo à venda", nftShopEmpty: "Nada está à venda.", nftMissing: "Esse token não está nesta conta.", nftScan: "Leia este código para abrir a página.", nftBadLink: "Este link não é uma página de venda.",
   },
   zh: {
     home: "首页", send: "发送", scan: "扫描", receive: "收款", transfer: "收发", activity: "活动", settings: "设置",
@@ -225,7 +240,7 @@ const CATALOG = {
     receiveHint: "金额留空时，二维码就是你的地址。",
     scanHint: "把码放进框里。如果模糊，点一下画面。",
     pastePlaceholder: "或粘贴链接或地址", open: "打开", emptyActivity: "还没有交易。",
-    type: "类型", detail: "详情", hash: "哈希", drops: "drops", amountInvalid: "请输入最多 6 位小数的金额。", nfts: "NFTs", nftEmpty: "此账户没有 URI 代币。", nftMint: "铸造 URI 代币", nftUri: "URI，例如 xahaucards://…", nftBurnable: "发行者可以销毁", nftPrice: "价格（XAH），可选", nftBuyer: "仅此买家，可选", nftBurn: "销毁", nftSell: "出售", nftCancelSale: "取消出售", nftBuy: "购买在售代币", nftTokenId: "代币 ID", nftForSale: "在售", nftEdition: "版次", nftUnavailable: "无法读取 URI 代币。", nftAccept: "接受", nftDecline: "拒绝", nftOffer: "报价", nftClose: "关闭", nftCount: "{n} / {m}",
+    type: "类型", detail: "详情", hash: "哈希", drops: "drops", amountInvalid: "请输入最多 6 位小数的金额。", nfts: "NFTs", nftEmpty: "此账户没有 URI 代币。", nftMint: "铸造 URI 代币", nftUri: "URI，例如 xahaucards://…", nftBurnable: "发行者可以销毁", nftPrice: "价格（XAH），可选", nftBuyer: "仅此买家，可选", nftBurn: "销毁", nftSell: "出售", nftMakeOffer: "出价", nftCancelSale: "取消出售", nftBuy: "购买在售代币", nftTokenId: "代币 ID", nftForSale: "在售", nftEdition: "版次", nftUnavailable: "无法读取 URI 代币。", nftAccept: "接受", nftDecline: "拒绝", nftOffer: "报价", nftClose: "关闭", nftCount: "{n} / {m}", nftAll: "全部", nftOffers: "报价", nftNotForSale: "未出售", nftNoMatch: "没有匹配。", nftCopy: "复制", nftCopied: "已复制", nftShare: "分享", nftShareShop: "分享在售", nftTweet: "在 Xahau 出售", nftShop: "全部在售", nftShopEmpty: "没有在售的代币。", nftMissing: "此账户没有该代币。", nftScan: "扫描此码打开页面。", nftBadLink: "这个链接不是出售页。",
   },
   ja: {
     home: "ホーム", send: "送金", scan: "スキャン", receive: "受取", transfer: "入出金", activity: "履歴", settings: "設定",
@@ -248,7 +263,7 @@ const CATALOG = {
     receiveHint: "金額を空にすると、コードはあなたのアドレスです。",
     scanHint: "コードを枠に合わせてください。ぼやけるときは画面をタップします。",
     pastePlaceholder: "またはリンクかアドレスを貼り付け", open: "開く", emptyActivity: "取引はまだありません。",
-    type: "種類", detail: "内容", hash: "ハッシュ", drops: "drops", amountInvalid: "小数は6桁までの金額を入力してください。", nfts: "NFTs", nftEmpty: "このアカウントに URI トークンはありません。", nftMint: "URI トークンを発行", nftUri: "URI（例 xahaucards://…）", nftBurnable: "発行者が破棄できる", nftPrice: "価格（XAH）、任意", nftBuyer: "この買い手だけ、任意", nftBurn: "破棄", nftSell: "売却", nftCancelSale: "売却を取り消す", nftBuy: "出品中のトークンを買う", nftTokenId: "トークン ID", nftForSale: "売却中", nftEdition: "エディション", nftUnavailable: "URI トークンを取得できません。", nftAccept: "受け取る", nftDecline: "辞退", nftOffer: "オファー", nftClose: "閉じる", nftCount: "{n} / {m}",
+    type: "種類", detail: "内容", hash: "ハッシュ", drops: "drops", amountInvalid: "小数は6桁までの金額を入力してください。", nfts: "NFTs", nftEmpty: "このアカウントに URI トークンはありません。", nftMint: "URI トークンを発行", nftUri: "URI（例 xahaucards://…）", nftBurnable: "発行者が破棄できる", nftPrice: "価格（XAH）、任意", nftBuyer: "この買い手だけ、任意", nftBurn: "破棄", nftSell: "売却", nftMakeOffer: "オファーを出す", nftCancelSale: "売却を取り消す", nftBuy: "出品中のトークンを買う", nftTokenId: "トークン ID", nftForSale: "売却中", nftEdition: "エディション", nftUnavailable: "URI トークンを取得できません。", nftAccept: "受け取る", nftDecline: "辞退", nftOffer: "オファー", nftClose: "閉じる", nftCount: "{n} / {m}", nftAll: "すべて", nftOffers: "オファー", nftNotForSale: "未出品", nftNoMatch: "該当なし", nftCopy: "コピー", nftCopied: "コピーしました", nftShare: "共有", nftShareShop: "出品を共有", nftTweet: "Xahau で売却中", nftShop: "出品一覧", nftShopEmpty: "出品中のトークンはありません。", nftMissing: "このアカウントにそのトークンはありません。", nftScan: "このコードをスキャンしてページを開きます。", nftBadLink: "このリンクは売却ページではありません。",
   },
   ko: {
     home: "홈", send: "보내기", scan: "스캔", receive: "받기", transfer: "이체", activity: "활동", settings: "설정",
@@ -271,7 +286,7 @@ const CATALOG = {
     receiveHint: "금액을 비우면 코드는 내 주소입니다.",
     scanHint: "코드를 프레임에 맞추세요. 흐리면 화면을 누르세요.",
     pastePlaceholder: "또는 링크나 주소를 붙여넣기", open: "열기", emptyActivity: "아직 거래가 없습니다.",
-    type: "유형", detail: "내용", hash: "해시", drops: "drops", amountInvalid: "소수점은 6자리까지 입력하세요.", nfts: "NFTs", nftEmpty: "이 계정에는 URI 토큰이 없습니다.", nftMint: "URI 토큰 발행", nftUri: "URI, 예: xahaucards://…", nftBurnable: "발행자가 소각할 수 있음", nftPrice: "가격(XAH), 선택", nftBuyer: "이 구매자만, 선택", nftBurn: "소각", nftSell: "판매", nftCancelSale: "판매 취소", nftBuy: "판매 중인 토큰 구매", nftTokenId: "토큰 ID", nftForSale: "판매 중", nftEdition: "에디션", nftUnavailable: "URI 토큰을 불러올 수 없습니다.", nftAccept: "수락", nftDecline: "거절", nftOffer: "제안", nftClose: "닫기", nftCount: "{n} / {m}",
+    type: "유형", detail: "내용", hash: "해시", drops: "drops", amountInvalid: "소수점은 6자리까지 입력하세요.", nfts: "NFTs", nftEmpty: "이 계정에는 URI 토큰이 없습니다.", nftMint: "URI 토큰 발행", nftUri: "URI, 예: xahaucards://…", nftBurnable: "발행자가 소각할 수 있음", nftPrice: "가격(XAH), 선택", nftBuyer: "이 구매자만, 선택", nftBurn: "소각", nftSell: "판매", nftMakeOffer: "제안하기", nftCancelSale: "판매 취소", nftBuy: "판매 중인 토큰 구매", nftTokenId: "토큰 ID", nftForSale: "판매 중", nftEdition: "에디션", nftUnavailable: "URI 토큰을 불러올 수 없습니다.", nftAccept: "수락", nftDecline: "거절", nftOffer: "제안", nftClose: "닫기", nftCount: "{n} / {m}", nftAll: "전체", nftOffers: "제안", nftNotForSale: "미판매", nftNoMatch: "일치하는 항목 없음", nftCopy: "복사", nftCopied: "복사함", nftShare: "공유", nftShareShop: "판매 공유", nftTweet: "Xahau에서 판매 중", nftShop: "판매 전체", nftShopEmpty: "판매 중인 토큰이 없습니다.", nftMissing: "이 계정에 그 토큰이 없습니다.", nftScan: "이 코드를 스캔하면 페이지가 열립니다.", nftBadLink: "이 링크는 판매 페이지가 아닙니다.",
   },
 };
 

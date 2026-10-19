@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>For sale · Xahau</title>
+<link rel="stylesheet" href="wallet.css">
+<script>
+(function () {
+  var theme = "dark";
+  var shell = "desk";
+  try {
+    if (localStorage.getItem("p256-theme") === "light") theme = "light";
+  } catch (error) {}
+  document.documentElement.dataset.theme = theme;
+  try {
+    var picked = localStorage.getItem("p256-shell");
+    if (picked === "phone" || picked === "desk") shell = picked;
+    else if (matchMedia("(max-width: 860px), (pointer: coarse)").matches) shell = "phone";
+  } catch (error) {
+    try {
+      if (matchMedia("(max-width: 860px), (pointer: coarse)").matches) shell = "phone";
+    } catch (ignored) {}
+  }
+  document.documentElement.dataset.shell = shell;
+})();
+</script>
+</head>
+<body>
+<main id="app" class="sale">Loading…</main>
+<script type="module" src="src/sale-page.mjs"></script>
+</body>
+</html>
