@@ -277,6 +277,7 @@ html[data-shell="phone"] main { max-width: 32rem; margin: auto; padding-bottom: 
 html[data-shell="phone"] #frame, html[data-shell="phone"] .stage, html[data-shell="phone"] .panel { min-width: 0; max-width: 100%; }
 html[data-shell="phone"] .head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin: 0 0 0.2rem; }
 html[data-shell="phone"] .head h1 { margin: 0; min-width: 0; }
+html[data-shell="phone"] .head-actions { display: flex; align-items: center; gap: 0.4rem; flex: none; }
 html[data-shell="phone"] button.theme {
   width: auto;
   height: 2rem;
@@ -456,7 +457,7 @@ html[data-shell="desk"] .sale-direct h1, html[data-shell="desk"] .sale-direct .m
 html[data-shell="desk"] .sale-actions { display: flex; flex-direction: column; align-items: stretch; gap: 0.75rem; }
 html[data-shell="desk"] .sale-actions .sale-links { justify-content: flex-start; }
 html[data-shell="phone"] .sale-qr { display: none; }
-html[data-shell="desk"] .sale-buy { display: none; }
+html[data-shell="desk"] .sale-actions:has(canvas.qr) .sale-buy { display: none; }
 html[data-shell="phone"] a.sale-return { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: center; box-sizing: border-box; height: calc(2.75rem + env(safe-area-inset-bottom)); margin: 0; padding: 0 .4rem env(safe-area-inset-bottom); background: var(--nav); border-top: 1px solid var(--line); color: var(--text); font-weight: 700; text-decoration: none; }
 html[data-shell="phone"] body:has(a.sale-return) main.sale { padding-bottom: calc(4.2rem + env(safe-area-inset-bottom)); }
 .sale-one { width: min(22rem, 100%); margin: 0.4rem auto 1rem; }

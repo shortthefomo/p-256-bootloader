@@ -178,8 +178,14 @@ function screen(title, nodes) {
   nav.replaceChildren();
 }
 
-function walletReturn(account) {
-  return safeReturn(params.get("return") || "", account) || (isAddress(account) ? pwaUrl(account) : "");
+function walletReturn(account, place) {
+  const back = safeReturn(params.get("return") || "", account) || (isAddress(account) ? pwaUrl(account) : "");
+  if (!back) return "";
+  const parts = [];
+  if (params.get("logged") === "1") parts.push("login=1");
+  if (place && String(place).indexOf("=") < 0) parts.push(params.get("logged") === "1" ? `view=${place}` : place);
+  else if (place) parts.push(String(place).replace(/^#/, ""));
+  return parts.length ? `${back}#${parts.join("&")}` : back;
 }
 
 function walletReturnLink(account) {
@@ -273,8 +279,8 @@ async function getPasskey(challenge, salt, credentialId) {
     rpId: location.hostname,
     userVerification: "required",
     timeout: 60000,
-    extensions: { prf: { eval: { first: salt } } },
   };
+  if (salt) publicKey.extensions = { prf: { eval: { first: salt } } };
   if (credentialId?.length) {
     publicKey.allowCredentials = [{ type: "public-key", id: credentialId }];
   }
@@ -476,7 +482,7 @@ async function attach(seed, { account, lock }) {
         ? "Level 3 is on. Losing this passkey locks the account. The seed cannot remove the hook."
         : "Level 2 is on. The seed can still remove the hook with a SetHook. Payments and account changes need the iPhone.",
     ]),
-    el("button", { onclick: () => location.assign(pwaUrl(wallet.address)) }, ["Open the wallet"]),
+    el("button", { onclick: () => location.assign(`${pwaUrl(wallet.address)}#login=1`) }, ["Open the wallet"]),
   ]);
 }
 
@@ -503,10 +509,10 @@ async function loadAccount(account) {
 }
 
 function sent(account, back, hash, result) {
-  const next = back || pwaUrl(account);
+  const next = walletReturn(account, `tx=${hash}`) || `${back || pwaUrl(account)}#tx=${hash}`;
   const url = txUrl(hash);
   const where = url ? el("a", { href: url, target: "_blank", rel: "noopener" }, [shortAddress(hash)]) : shortAddress(hash);
-  const backBtn = el("button", { onclick: () => location.assign(`${next}#tx=${hash}`) }, ["Back to wallet"]);
+  const backBtn = el("button", { onclick: () => location.assign(next) }, ["Back to wallet"]);
   screen("Result", [
     el("p", {}, ["Sent ", where, "."]),
     el("details", { class: "raw" }, [
@@ -530,7 +536,7 @@ function rejected(account, back, error, retry) {
       class: "ghost",
       onclick: () => {
         if (retry) retry();
-        else if (back) location.assign(back);
+        else if (back) location.assign(params.get("logged") === "1" ? (walletReturn(account) || back) : back);
         else composer({ account, back });
       },
     }, [retry ? text("backToSettings") : "Back"]),
@@ -2080,7 +2086,11 @@ function handoff({ account, back, summary, url, watch, signHere }) {
     el("button", {
       class: "link",
       type: "button",
-      onclick: () => (back ? location.assign(back) : walletHome(account)),
+      onclick: () => {
+        const next = params.get("logged") === "1" ? (walletReturn(account) || back) : back;
+        if (next) location.assign(next);
+        else walletHome(account);
+      },
     }, ["Cancel"]),
   ]);
   const gen = viewGen;
@@ -2443,6 +2453,73 @@ async function pay({ account, dest, xah, back }) {
   await approve({ account, back, needsPublicKey: false, make: () => made });
 }
 
+async function finishLogin(account, back, loaded) {
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+  const assertion = await getPasskey(challenge, null, loaded.credentialId);
+  await assertAssertion(assertion, challenge);
+  rememberAccount(account);
+  location.assign(`${back}#login=1`);
+}
+
+async function login(account) {
+  const back = safeReturn(params.get("return") || "", account) || (isAddress(account) ? pwaUrl(account) : "");
+  if (!isAddress(account) || !back) {
+    home();
+    return;
+  }
+  let loaded;
+  try {
+    loaded = await loadAccount(account);
+  } catch (error) {
+    screen(text("login"), [
+      el("p", {}, [error.message || String(error)]),
+      el("a", { class: "b g", href: back }, [text("backToWallet")]),
+    ]);
+    return;
+  }
+  const failLogin = (error) => {
+    screen(text("login"), [
+      el("p", {}, [error.message || String(error)]),
+      el("a", { class: "b g", href: back }, [text("backToWallet")]),
+    ]);
+  };
+  if (shell() !== "desk") {
+    try {
+      await finishLogin(account, back, loaded);
+    } catch (error) {
+      failLogin(error);
+    }
+    return;
+  }
+  let canvas;
+  try {
+    canvas = qrCanvas(`${location.origin}${location.pathname}?op=login&account=${encodeURIComponent(account)}&return=${encodeURIComponent(back)}`);
+  } catch (error) {
+    failLogin(error);
+    return;
+  }
+  const status = el("p", { class: "warn" }, [""]);
+  status.hidden = true;
+  const here = el("button", { type: "button" }, [text("loginHere")]);
+  screen(text("login"), [
+    el("p", { class: "lede" }, [text("loginHint")]),
+    el("div", { class: "qrbox" }, [canvas]),
+    status,
+    here,
+    el("a", { class: "b g", href: back }, [text("backToWallet")]),
+  ]);
+  const gen = viewGen;
+  here.addEventListener("click", () => {
+    if (gen !== viewGen) return;
+    here.disabled = true;
+    finishLogin(account, back, loaded).catch((error) => {
+      here.disabled = false;
+      status.hidden = false;
+      status.textContent = error.message || String(error);
+    });
+  });
+}
+
 function home() {
   const account = el("input", { type: "text", placeholder: "Account r…", autocomplete: "off", spellcheck: "false" });
   const seed = el("input", { type: "password", placeholder: "Family seed s…", autocomplete: "off", spellcheck: "false" });
@@ -2480,7 +2557,7 @@ function home() {
       return;
     }
     rememberAccount(text);
-    location.assign(pwaUrl(text));
+    location.assign(`${location.origin}${location.pathname}?op=login&account=${encodeURIComponent(text)}`);
   });
 
   create.addEventListener("click", async () => {
@@ -2538,7 +2615,7 @@ async function main() {
       return;
     }
     const place = op === "nfts" ? "nfts" : op;
-    location.assign(`${pwaUrl(account)}#${place}`);
+    location.assign(walletReturn(account, place));
     return;
   }
   if (!globalThis.PublicKeyCredential && shell() === "phone" && op !== "scan" && op !== "receive" && op !== "settings" && op !== "update" && op !== "nfts") {
@@ -2546,6 +2623,10 @@ async function main() {
     return;
   }
   try {
+    if (op === "login") {
+      await login(named);
+      return;
+    }
     if (op === "qr") {
       const found = parseScan(location.href);
       if (found.type !== "qr") throw new Error("this sign QR is not valid");
@@ -2638,7 +2719,7 @@ async function main() {
         openBuilt({ account, kind: "URITokenCreateSellOffer", values, back }).catch((error) => rejected(account, back, error));
         return;
       }
-      location.assign(`${pwaUrl(account)}#nfts`);
+      location.assign(walletReturn(account, "nfts"));
       return;
     }
     if (op === "settings" || op === "update") {
