@@ -681,8 +681,8 @@ function renderNav(active) {
   nav.hidden = false;
   const phone = shell() === "phone";
   const items = phone
-    ? ["home", "transfer", "nfts", "scan", "settings"]
-    : ["home", "send", "receive", "nfts", "activity", "scan", "settings"];
+    ? ["home", "transfer", "nfts", "shop", "scan", "settings"]
+    : ["home", "send", "receive", "nfts", "shop", "activity", "scan", "settings"];
   const buttons = items.map((id) => {
     const label = text(id);
     return el("button", {
@@ -1060,12 +1060,29 @@ async function paintVersion(body, account) {
   pageCard.replaceChildren(...pageNodes);
 }
 
+function openShop(account) {
+  const page = saleLink(account);
+  if (!page) return;
+  try {
+    if (new URL(page).origin === location.origin) {
+      location.assign(page);
+      return;
+    }
+  } catch {
+    // The store link is shown instead.
+  }
+  screen(text("shop"), [
+    el("a", { href: page, target: "_blank", rel: "noopener" }, [text("shop")]),
+  ], "shop");
+}
+
 function route(id, account) {
   if (id === "home") walletHome(account);
   else if (id === "send" || id === "transfer") sendForm(account);
   else if (id === "scan") scan(account);
   else if (id === "receive") receive(account);
   else if (id === "nfts") uriTokens(account);
+  else if (id === "shop") openShop(account);
   else if (id === "settings") settings(account);
   else activity(account);
 }

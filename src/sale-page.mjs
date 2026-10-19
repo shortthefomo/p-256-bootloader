@@ -5,7 +5,7 @@
 import { translate, LANGUAGES } from "./locale.mjs";
 import { dropsToXah } from "./protocol.mjs";
 import { encodeQr } from "./qr.mjs";
-import { isAddress, saleLink, shortAddress, tweetLink } from "./scan.mjs";
+import { buyOfferLink, isAddress, saleLink, shortAddress, tweetLink } from "./scan.mjs";
 import { cardArt, normalizeUriToken } from "./uri-tokens.mjs";
 
 const WSS = "wss://passkey.xahau-dev.net";
@@ -177,7 +177,7 @@ function codeBlock(page, say) {
     box.append(el("code", { class: "nft-id-field" }, [page]));
   }
   return el("div", {}, [
-    el("p", { class: "m" }, [say("nftScan")]),
+    el("p", { class: "m" }, [say("nftOfferScan")]),
     box,
   ]);
 }
@@ -244,6 +244,7 @@ function oneToken(account, token, say) {
   const title = tokenTitle(token);
   const price = priceLabel(token.amount);
   const forSale = token.amount != null && token.amount !== "";
+  const offer = forSale ? buyOfferLink(token) : "";
   const page = saleLink(account, token.id);
   const message = forSale ? `${title} · ${say("nftTweet")}` : title;
   return [el("div", { class: "sale-direct" }, [
@@ -262,7 +263,7 @@ function oneToken(account, token, say) {
     ]),
     token.destination ? el("p", { class: "m" }, [shortAddress(token.destination)]) : null,
     token.id ? tokenIdBlock(token.id, say) : null,
-    page ? codeBlock(page, say) : null,
+    offer ? codeBlock(offer, say) : null,
     el("div", { class: "sale-links" }, [
       page ? shareAnchor(page, say("nftShare"), message) : null,
       el("a", { class: "b g", href: saleLink(account) }, [say("nftShop")]),
@@ -279,7 +280,6 @@ function shop(account, tokens, say) {
     cards.length
       ? el("div", { class: "nft-grid" }, cards)
       : el("p", {}, [say("nftShopEmpty")]),
-    page ? codeBlock(page, say) : null,
     page ? el("div", { class: "sale-links" }, [shareAnchor(page, say("nftShareShop"), say("nftTweet"))]) : null,
   ];
 }

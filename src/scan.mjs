@@ -138,6 +138,28 @@ export function requestLink({ page, account, kind, values, returnTo = "" }) {
   return url.href;
 }
 
+const SIGNER_PAGE = "https://shortthefomo.github.io/p-256-bootloader/";
+
+// A listed token's QR is the buy the scanner signs. The buyer is chosen
+// when the code is scanned, so the seller's account stays out of it.
+export function buyOfferLink(token) {
+  const id = String(token?.id || "").trim().toUpperCase();
+  if (!/^[0-9A-F]{64}$/.test(id)) return "";
+  const amount = token?.amount;
+  const values = { id };
+  if (typeof amount === "string") {
+    if (!/^\d+$/.test(amount)) return "";
+    values.xah = dropsToXah(amount);
+  } else if (amount && typeof amount === "object" && !Array.isArray(amount) && amount.value && amount.currency) {
+    values.xah = String(amount.value);
+    values.currency = String(amount.currency);
+    if (amount.issuer) values.issuer = String(amount.issuer);
+  } else {
+    return "";
+  }
+  return requestLink({ page: SIGNER_PAGE, account: "", kind: "URITokenBuy", values });
+}
+
 function hexBytes(hex) {
   const out = new Uint8Array(hex.length / 2);
   for (let i = 0; i < out.length; i += 1) out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
