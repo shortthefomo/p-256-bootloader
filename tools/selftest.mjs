@@ -318,7 +318,8 @@ const keptToken = "ab".repeat(32);
 const keptHash = "cd".repeat(32);
 const keptSale = sessionReturn(account, servedWallet, `token=${keptToken}&tx=${keptHash}`, true);
 const keptBurn = sessionReturn(account, servedWallet, "view=nfts", true);
-const publicBuy = sessionReturn(account, otherShop, `view=nfts&tx=${keptHash}`, true);
+const keptDesk = sessionReturn(account, servedWallet, `shell=desk&token=${keptToken}`, true);
+const publicBuy = sessionReturn(account, otherShop, `shell=desk&view=nfts&tx=${keptHash}`, true);
 const signedQr = requestLink({
   page: "https://shortthefomo.github.io/p-256-bootloader/",
   account,
@@ -326,9 +327,11 @@ const signedQr = requestLink({
   values: { id: keptToken, xah: "3" },
   returnTo: servedWallet,
   logged: true,
+  shell: "desk",
 });
 const scannedSale = parseScan(signedQr);
-check("a signed return keeps the login", keptSale === `${servedWallet}#login=1&token=${keptToken}&tx=${keptHash}` && keptBurn === `${servedWallet}#login=1&view=nfts` && sessionReturn(account, servedWallet, `token=${keptToken}`, false) === `${servedWallet}#token=${keptToken}` && publicBuy === `${otherShop}#view=nfts&tx=${keptHash}` && !publicBuy.includes("login=") && pageAccount(servedWallet) === account && pageAccount(otherShop) === buyer && sessionReturn(account, `https://evil.example/${account}`, `tx=${keptHash}`, true) === `${pwaUrl(account)}#login=1&tx=${keptHash}` && scannedSale.returnTo === servedWallet && scannedSale.kind === "URITokenCreateSellOffer" && new URL(signedQr).searchParams.get("logged") === "1" && new URL(payLink({ page: "https://shortthefomo.github.io/p-256-bootloader/", account, dest: buyer, xah: "1", returnTo: servedWallet, logged: true })).searchParams.get("logged") === "1");
+const signedPay = payLink({ page: "https://shortthefomo.github.io/p-256-bootloader/", account, dest: buyer, xah: "1", returnTo: servedWallet, logged: true, shell: "desk" });
+check("a signed return keeps the login", keptSale === `${servedWallet}?login=1#login=1&token=${keptToken}&tx=${keptHash}` && keptBurn === `${servedWallet}?login=1#login=1&view=nfts` && keptDesk === `${servedWallet}?login=1&shell=desk#login=1&shell=desk&token=${keptToken}` && sessionReturn(account, servedWallet, `token=${keptToken}`, false) === `${servedWallet}#token=${keptToken}` && publicBuy === `${otherShop}#view=nfts&tx=${keptHash}` && !publicBuy.includes("login=") && !publicBuy.includes("shell=") && pageAccount(servedWallet) === account && pageAccount(otherShop) === buyer && sessionReturn(account, `https://evil.example/${account}`, `tx=${keptHash}`, true) === `${pwaUrl(account)}?login=1#login=1&tx=${keptHash}` && scannedSale.returnTo === servedWallet && scannedSale.kind === "URITokenCreateSellOffer" && new URL(signedQr).searchParams.get("logged") === "1" && new URL(signedQr).searchParams.get("shell") === "desk" && new URL(signedPay).searchParams.get("logged") === "1" && new URL(signedPay).searchParams.get("shell") === "desk" && walletJs.includes('location.search || ""') && walletJs.includes('searchParams.delete("login")') && signerApp.includes("function staying(") && signerApp.includes("sessionReturn(account, back, withShell(\"\"), true)"));
 const payment = transactionFromKind("Payment", { destination: account, xah: "2" });
 check("payment form is native drops", payment.tx.Amount === "2000000" && payment.payment.drops === 2000000n);
 const trust = transactionFromKind("TrustSet", { issuer: account, currency: "usd", limit: "100" });

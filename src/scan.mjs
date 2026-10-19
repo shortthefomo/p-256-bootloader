@@ -117,7 +117,11 @@ function pageUrl(page) {
   return url;
 }
 
-export function payLink({ page, account = "", dest, xah, returnTo = "", logged = false }) {
+function shellParam(shell) {
+  return shell === "phone" || shell === "desk" ? shell : "";
+}
+
+export function payLink({ page, account = "", dest, xah, returnTo = "", logged = false, shell = "" }) {
   const url = pageUrl(page);
   const query = new URLSearchParams();
   query.set("op", "pay");
@@ -126,15 +130,17 @@ export function payLink({ page, account = "", dest, xah, returnTo = "", logged =
   query.set("xah", xah);
   if (returnTo) query.set("return", returnTo);
   if (logged) query.set("logged", "1");
+  if (shellParam(shell)) query.set("shell", shellParam(shell));
   url.search = query.toString();
   return url.href;
 }
 
-export function requestLink({ page, account, kind, values, returnTo = "", logged = false }) {
+export function requestLink({ page, account, kind, values, returnTo = "", logged = false, shell = "" }) {
   const url = pageUrl(page);
   const query = new URLSearchParams();
   query.set("op", "qr");
   if (logged) query.set("logged", "1");
+  if (shellParam(shell)) query.set("shell", shellParam(shell));
   url.search = query.toString();
   const payload = { v: 1, a: account, k: kind, f: values };
   if (returnTo) payload.r = returnTo;

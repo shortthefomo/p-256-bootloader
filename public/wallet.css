@@ -302,7 +302,8 @@ html[data-shell="phone"] #frame, html[data-shell="phone"] .stage, html[data-shel
 html[data-shell="phone"] .head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin: 0 0 0.2rem; }
 html[data-shell="phone"] .head h1 { margin: 0; min-width: 0; }
 html[data-shell="phone"] .head-actions { display: flex; align-items: center; gap: 0.4rem; flex: none; }
-html[data-shell="phone"] button.theme {
+html[data-shell="phone"] button.theme,
+html[data-shell="phone"] a.theme {
   width: auto;
   height: 2rem;
   margin: 0;
@@ -315,6 +316,7 @@ html[data-shell="phone"] button.theme {
   font: inherit;
   font-size: 0.8rem;
   font-weight: 650;
+  text-decoration: none;
 }
 html[data-shell="phone"] .panel h2 { display: none; }
 html[data-shell="phone"] #settings h2,

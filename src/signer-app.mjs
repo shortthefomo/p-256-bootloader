@@ -199,12 +199,24 @@ function screen(title, nodes) {
   nav.replaceChildren();
 }
 
+function withShell(marker) {
+  const shell = params.get("shell");
+  const text = String(marker || "").replace(/^#/, "");
+  if (shell !== "phone" && shell !== "desk") return text;
+  if (text.split("&").indexOf(`shell=${shell}`) >= 0) return text;
+  return text ? `shell=${shell}&${text}` : `shell=${shell}`;
+}
+
+function staying() {
+  return params.get("logged") === "1";
+}
+
 function walletReturn(account, place, explicit) {
   const source = explicit || params.get("return") || "";
   let marker = "";
-  if (place && String(place).indexOf("=") < 0) marker = params.get("logged") === "1" ? `view=${place}` : String(place);
+  if (place && String(place).indexOf("=") < 0) marker = staying() ? `view=${place}` : String(place);
   else if (place) marker = String(place).replace(/^#/, "");
-  return sessionReturn(account, source, marker, params.get("logged") === "1");
+  return sessionReturn(account, source, withShell(marker), staying());
 }
 
 function nftHome(account, back, tx) {
@@ -223,7 +235,7 @@ function nftLanding(account, back, home, hash) {
   if (token) bits.push(`token=${token}`);
   else bits.push("view=nfts");
   if (hash) bits.push(`tx=${hash}`);
-  return sessionReturn(account, back, bits.join("&"), params.get("logged") === "1");
+  return sessionReturn(account, back, withShell(bits.join("&")), staying());
 }
 
 function uriBack(account, url, kind) {
@@ -523,7 +535,7 @@ async function attach(seed, { account, lock }) {
         ? "Level 3 is on. Losing this passkey locks the account. The seed cannot remove the hook."
         : "Level 2 is on. The seed can still remove the hook with a SetHook. Payments and account changes need the iPhone.",
     ]),
-    el("button", { onclick: () => location.assign(`${pwaUrl(wallet.address)}#login=1`) }, ["Open the wallet"]),
+    el("button", { onclick: () => location.assign(sessionReturn(wallet.address, "", "", true)) }, ["Open the wallet"]),
   ]);
 }
 
@@ -550,7 +562,7 @@ async function loadAccount(account) {
 }
 
 function sent(account, back, hash, result, home) {
-  const next = nftLanding(account, back, home, hash) || walletReturn(account, `tx=${hash}`, back) || `${back || pwaUrl(account)}#tx=${hash}`;
+  const next = nftLanding(account, back, home, hash) || walletReturn(account, `tx=${hash}`, back) || sessionReturn(account, back || "", withShell(`tx=${hash}`), staying());
   const url = txUrl(hash);
   const where = url ? el("a", { href: url, target: "_blank", rel: "noopener" }, [shortAddress(hash)]) : shortAddress(hash);
   const backBtn = el("button", { onclick: () => location.assign(next) }, ["Back to wallet"]);
@@ -579,7 +591,7 @@ function rejected(account, back, error, retry, home) {
       onclick: () => {
         if (retry) retry();
         else if (nft) location.assign(nft);
-        else if (back) location.assign(walletReturn(account, "", back) || back);
+        else if (back) location.assign(walletReturn(account, "", back) || sessionReturn(account, back, "", staying()) || back);
         else composer({ account, back });
       },
     }, [retry ? text("backToSettings") : "Back"]),
@@ -2123,7 +2135,7 @@ function handoff({ account, back, summary, url, watch, signHere }) {
       type: "button",
       onclick: () => {
         const next = nftLanding(account, back, nftHome(account, back, watch), "")
-          || walletReturn(account, "", back) || back;
+          || walletReturn(account, "", back) || sessionReturn(account, back, "", staying()) || back;
         if (next) location.assign(next);
         else walletHome(account);
       },
@@ -2182,7 +2194,7 @@ async function openBuilt({ account, kind, values, back }) {
     account,
     back,
     summary: preview.summary,
-    url: requestLink({ page: location.href, account, kind, values, returnTo: back || "", logged: params.get("logged") === "1" }),
+    url: requestLink({ page: location.href, account, kind, values, returnTo: back || "", logged: staying() }),
     watch: preview.payment
       ? { dest: preview.payment.destination, drops: preview.payment.drops }
       : { type: preview.tx.TransactionType, destination: preview.tx.Destination || "", token: preview.tx.URITokenID || "" },
@@ -2501,7 +2513,7 @@ async function pay({ account, dest, xah, back }) {
       account,
       back,
       summary: made.summary,
-      url: payLink({ page: location.href, account, dest, xah, returnTo: back || "", logged: params.get("logged") === "1" }),
+      url: payLink({ page: location.href, account, dest, xah, returnTo: back || "", logged: staying() }),
       watch: { dest, drops: made.payment.drops },
       signHere: () => approve({ account, back, needsPublicKey: false, make: () => made }).catch((error) => rejected(account, back, error)),
     });
@@ -2515,7 +2527,7 @@ async function finishLogin(account, back, loaded) {
   const assertion = await getPasskey(challenge, null, loaded.credentialId);
   await assertAssertion(assertion, challenge);
   rememberAccount(account);
-  location.assign(`${back}#login=1`);
+  location.assign(sessionReturn(account, back, withShell(""), true) || `${back}#login=1`);
 }
 
 async function login(account) {
@@ -2524,20 +2536,21 @@ async function login(account) {
     home();
     return;
   }
+  const backLink = () => el("a", { class: "b g", href: walletReturn(account, "", back) || back }, [text("backToWallet")]);
   let loaded;
   try {
     loaded = await loadAccount(account);
   } catch (error) {
     screen(text("login"), [
       el("p", {}, [error.message || String(error)]),
-      el("a", { class: "b g", href: back }, [text("backToWallet")]),
+      backLink(),
     ]);
     return;
   }
   const failLogin = (error) => {
     screen(text("login"), [
       el("p", {}, [error.message || String(error)]),
-      el("a", { class: "b g", href: back }, [text("backToWallet")]),
+      backLink(),
     ]);
   };
   if (shell() !== "desk") {
@@ -2548,9 +2561,14 @@ async function login(account) {
     }
     return;
   }
+  const loginQuery = new URLSearchParams();
+  loginQuery.set("op", "login");
+  loginQuery.set("account", account);
+  loginQuery.set("return", back);
+  if (staying()) loginQuery.set("logged", "1");
   let canvas;
   try {
-    canvas = qrCanvas(`${location.origin}${location.pathname}?op=login&account=${encodeURIComponent(account)}&return=${encodeURIComponent(back)}`);
+    canvas = qrCanvas(`${location.origin}${location.pathname}?${loginQuery}`);
   } catch (error) {
     failLogin(error);
     return;
@@ -2563,7 +2581,7 @@ async function login(account) {
     el("div", { class: "qrbox" }, [canvas]),
     status,
     here,
-    el("a", { class: "b g", href: back }, [text("backToWallet")]),
+    backLink(),
   ]);
   const gen = viewGen;
   here.addEventListener("click", () => {

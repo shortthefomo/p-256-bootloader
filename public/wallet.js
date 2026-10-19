@@ -186,6 +186,8 @@ function shellChoice() {
   try {
     var fromHash = new URLSearchParams(location.hash.slice(1)).get("shell");
     if (fromHash === "phone" || fromHash === "desk") return fromHash;
+    var fromQuery = new URLSearchParams(location.search).get("shell");
+    if (fromQuery === "phone" || fromQuery === "desk") return fromQuery;
   } catch (error) {}
   return "";
 }
@@ -277,7 +279,8 @@ function applyLanguage() {
 // user navigation, which this top-level page is allowed to do.
 function loggedIn() {
   try {
-    return new URLSearchParams((location.hash || "").replace(/^#/, "")).get("login") === "1";
+    if (new URLSearchParams((location.hash || "").replace(/^#/, "")).get("login") === "1") return true;
+    return new URLSearchParams(location.search || "").get("login") === "1";
   } catch (error) {
     return false;
   }
@@ -286,6 +289,7 @@ function loggedIn() {
 function href(op, extra) {
   const query = new URLSearchParams(Object.assign({ op: op, account: acct }, extra || {}));
   if (loggedIn()) query.set("logged", "1");
+  query.set("shell", phone ? "phone" : "desk");
   try {
     const back = new URL(location.href);
     back.search = "";
@@ -483,6 +487,7 @@ function receiveCode(xah) {
   query.set("dest", acct);
   query.set("xah", xah);
   if (loggedIn()) query.set("logged", "1");
+  query.set("shell", phone ? "phone" : "desk");
   try {
     var back = new URL(location.href);
     back.search = "";
@@ -678,13 +683,46 @@ function deskItem(key, url) {
   return node;
 }
 
+function logoutTarget() {
+  try {
+    var page = new URL(location.href);
+    page.searchParams.delete("login");
+    var hash = hashBag();
+    hash.delete("login");
+    var shell = hash.get("shell");
+    var declined = hash.get("declined");
+    var view = hash.get("view") || "";
+    var token = (hash.get("token") || "").toUpperCase();
+    var next = new URLSearchParams();
+    if (shell === "phone" || shell === "desk") next.set("shell", shell);
+    if (declined) next.set("declined", declined);
+    if (/^[0-9A-F]{64}$/.test(token)) next.set("token", token);
+    else if (view && view !== "home") next.set("view", view);
+    var bare = !next.has("shell") && !next.has("declined");
+    page.hash = bare && next.has("token") ? "token=" + token : (bare && next.has("view") ? view : next.toString());
+    return page.href;
+  } catch (error) {
+    return location.pathname || ".";
+  }
+}
+
 function logoutControl(className) {
-  var node = document.createElement("button");
-  node.type = "button";
+  var node = document.createElement("a");
   node.className = className;
+  node.href = logoutTarget();
   node.dataset.i18n = "logout";
   node.textContent = t("logout");
-  node.onclick = function () {
+  node.onclick = function (event) {
+    var next = null;
+    var here = null;
+    try {
+      next = new URL(node.href, location.href);
+      here = new URL(location.href);
+    } catch (error) {
+      return;
+    }
+    if (next.origin !== here.origin || next.pathname !== here.pathname || next.search !== here.search) return;
+    event.preventDefault();
     putHash({ login: "" });
     location.reload();
   };

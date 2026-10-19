@@ -518,18 +518,42 @@ export function pageAccount(url) {
   }
 }
 
+function sessionBits(marker) {
+  let shell = "";
+  const rest = [];
+  for (const part of String(marker || "").replace(/^#/, "").split("&")) {
+    if (!part || part === "login=1") continue;
+    if ((part === "shell=phone" || part === "shell=desk") && !shell) {
+      shell = part.slice("shell=".length);
+      continue;
+    }
+    rest.push(part);
+  }
+  return { shell, rest };
+}
+
 // The account page is often a numbered host, not PWA_HOST. Login stays on
-// that same account. A return to a different account stays a public page.
+// that same account. The front door 301s to that host, and Safari drops a
+// fragment on that redirect, so login and layout also travel in the query.
+// A return to a different account stays a public page.
 export function sessionReturn(account, back, marker, logged) {
   const shop = pwaPage(back || "");
   const who = pageAccount(shop);
   const own = PWA_ACCOUNT.test(String(account || "")) ? String(account) : "";
-  const hash = String(marker || "").replace(/^#/, "");
+  const { shell, rest } = sessionBits(marker);
+  const hash = rest.join("&");
   if (shop && who !== own) return hash ? `${shop}#${hash}` : shop;
   const page = shop || safeReturn(back || "", own) || (own ? pwaUrl(own) : "");
   if (!page) return "";
-  const parts = [];
-  if (logged && own) parts.push("login=1");
-  if (hash) parts.push(hash);
-  return parts.length ? `${page}#${parts.join("&")}` : page;
+  const keep = Boolean(logged) && Boolean(own);
+  const query = new URLSearchParams();
+  if (keep) query.set("login", "1");
+  if (shell) query.set("shell", shell);
+  const hashParts = [];
+  if (keep) hashParts.push("login=1");
+  if (shell) hashParts.push(`shell=${shell}`);
+  if (hash) hashParts.push(hash);
+  const search = query.toString();
+  const body = hashParts.join("&");
+  return `${page}${search ? `?${search}` : ""}${body ? `#${body}` : ""}`;
 }
