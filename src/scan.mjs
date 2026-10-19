@@ -117,7 +117,7 @@ function pageUrl(page) {
   return url;
 }
 
-export function payLink({ page, account = "", dest, xah, returnTo = "" }) {
+export function payLink({ page, account = "", dest, xah, returnTo = "", logged = false }) {
   const url = pageUrl(page);
   const query = new URLSearchParams();
   query.set("op", "pay");
@@ -125,13 +125,17 @@ export function payLink({ page, account = "", dest, xah, returnTo = "" }) {
   query.set("dest", dest);
   query.set("xah", xah);
   if (returnTo) query.set("return", returnTo);
+  if (logged) query.set("logged", "1");
   url.search = query.toString();
   return url.href;
 }
 
-export function requestLink({ page, account, kind, values, returnTo = "" }) {
+export function requestLink({ page, account, kind, values, returnTo = "", logged = false }) {
   const url = pageUrl(page);
-  url.search = "op=qr";
+  const query = new URLSearchParams();
+  query.set("op", "qr");
+  if (logged) query.set("logged", "1");
+  url.search = query.toString();
   const payload = { v: 1, a: account, k: kind, f: values };
   if (returnTo) payload.r = returnTo;
   url.hash = `p=${encodePayload(payload)}`;

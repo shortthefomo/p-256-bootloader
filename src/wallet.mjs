@@ -506,3 +506,30 @@ export function pwaPage(url) {
 export function pwaUrl(account) {
   return `${PWA_HOST}/${account}`;
 }
+
+export function pageAccount(url) {
+  const page = pwaPage(url || "");
+  if (!page) return "";
+  try {
+    const who = new URL(page).pathname.replace(/^\//, "");
+    return PWA_ACCOUNT.test(who) ? who : "";
+  } catch {
+    return "";
+  }
+}
+
+// The account page is often a numbered host, not PWA_HOST. Login stays on
+// that same account. A return to a different account stays a public page.
+export function sessionReturn(account, back, marker, logged) {
+  const shop = pwaPage(back || "");
+  const who = pageAccount(shop);
+  const own = PWA_ACCOUNT.test(String(account || "")) ? String(account) : "";
+  const hash = String(marker || "").replace(/^#/, "");
+  if (shop && who !== own) return hash ? `${shop}#${hash}` : shop;
+  const page = shop || safeReturn(back || "", own) || (own ? pwaUrl(own) : "");
+  if (!page) return "";
+  const parts = [];
+  if (logged && own) parts.push("login=1");
+  if (hash) parts.push(hash);
+  return parts.length ? `${page}#${parts.join("&")}` : page;
+}
