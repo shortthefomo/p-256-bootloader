@@ -624,7 +624,7 @@ async function approve({ account, back, make, needsPublicKey, next, note, retry,
   screen(made.summary || "Approve", [
     hint ? el("p", {}, [hint]) : null,
     el("p", {}, [`${text("networkFee")} ${showAmount(prepared.Fee)} XAH`]),
-    el("details", { class: "raw" }, [el("summary", {}, ["Transaction details"]), pre]),
+    el("details", { class: "raw", open: true }, [el("summary", {}, ["Transaction details"]), pre]),
     go,
   ]);
 

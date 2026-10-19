@@ -185,7 +185,8 @@ let badLevel = false;
 try { levelTx(4); } catch { badLevel = true; }
 check("level 3 firewall update keeps the hook installed", hookLevel({}) === 1 && hookLevel({ namespace_entries: [{ HookStateKey: "4C56".padStart(64, "0"), HookStateData: "03" }] }) === 3 && hookLevel({ namespace_entries: [{ HookStateKey: "4C56".padStart(64, "0"), HookStateData: "02" }] }) === 2 && levelTx(2).TransactionType === "Invoke" && levelTx(2).HookParameters[0].HookParameter.HookParameterValue === "02" && levelTx(3).HookParameters[0].HookParameter.HookParameterValue === "03" && badLevel && !signerApp.includes("clearHookTx") && signerApp.includes("levelTx(2)") && signerApp.includes("setHookTx(code)") && signerApp.includes("p256-restore-level") && translate("en", "lowerFirewall") === "Lower the firewall to level 2" && ["stays installed", "sigue instalado", "reste installé", "bleibt installiert", "continua instalado", "仍会留在", "導入されたまま", "설치된 채로"].every((part) => localeSrc.includes(part)));
 check("ledger json starts collapsed", walletJs.includes('createElement("details")') && walletJs.includes("raw.open = false"));
-check("signer json starts collapsed", signerApp.includes('class: "raw"') && signerApp.includes('["Details"]') && signerApp.includes('["Transaction details"]'));
+check("signer json starts collapsed", signerApp.includes('class: "raw"') && signerApp.includes('["Details"]') && signerApp.includes('["Transaction details"]') && signerApp.includes('el("details", { class: "raw" }, [\n      el("summary", {}, ["Details"])'));
+check("the approval screen opens transaction details", signerApp.includes('el("details", { class: "raw", open: true }, [el("summary", {}, ["Transaction details"])'));
 check("signing does not rename the passkey", !signerApp.includes("signalCurrentUserDetails"));
 const walletSrc = readFileSync(new URL("../src/wallet.mjs", import.meta.url), "utf8");
 const liveSrc = readFileSync(new URL("./live.mjs", import.meta.url), "utf8");
@@ -239,6 +240,7 @@ check("a network can list several explorers", explorerUrls(txHash, [
 ]).map((item) => item.url).join(" ") === `https://one.example/tx/${txHash} https://two.example/transactions/${txHash}`);
 check("tx link needs 64 hex", txUrl("abcd") === "");
 check("ledger uses the same explorer", walletJs.includes(`origin: "${EXPLORER}"`) && walletJs.includes('txPath: "/tx/"') && walletJs.includes("function txUrl(") && walletJs.includes("links[0].url"));
+check("activity starts with fifty and scrolls for more", walletJs.includes("var ACTIVITY_PAGE = 50") && walletJs.includes("query.marker = marker") && walletJs.includes('addEventListener("scroll", moreActivity'));
 check("activity rows link out", signerApp.includes("explorerLinks(") && signerApp.includes("txUrl(") && signerApp.includes("links[0].url") && !signerApp.includes("links.slice(1)"));
 const signerHtml = readFileSync(new URL("../public/signer.html", import.meta.url), "utf8");
 const walletCss = readFileSync(new URL("../public/wallet.css", import.meta.url), "utf8");

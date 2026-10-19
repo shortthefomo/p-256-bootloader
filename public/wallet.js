@@ -659,6 +659,7 @@ function showDesk(view) {
     layout.dataset.view = name;
     if (name === "settings") paintLedgerSettings();
     if (name === "transfer") paintTransfer();
+    if (name === "home" || name === "activity") moreActivity();
     if (nftOverlay && !nftOverlay.hidden && name !== "nfts" && name !== "home" && name !== "activity") closeViewer();
   }
   var keys = Object.keys(deskButtons);
@@ -830,6 +831,13 @@ function artFrame(face) {
 var ownedNodes = [];
 var offerNodes = {};
 var activityRows = [];
+var ACTIVITY_PAGE = 50;
+var activityMarker = null;
+var activityBusy = false;
+var activityAgain = false;
+var activityDone = false;
+var activityOlder = false;
+var activityMoreNote = null;
 var viewerPos = 0;
 var nftMode = "all";
 var nftIssuer = "";
@@ -1639,6 +1647,136 @@ function showActivity(entries) {
   });
 }
 
+function sameMarker(left, right) {
+  if (!left || !right) return !left && !right;
+  try { return JSON.stringify(left) === JSON.stringify(right); } catch (error) { return false; }
+}
+
+function txKey(entry) {
+  var tx = entry.tx_json || entry.tx || {};
+  return String(entry.hash || tx.hash || "");
+}
+
+function applyActivityPage(page, older) {
+  var batch = page.transactions || [];
+  if (!older && !activityOlder) {
+    activityRows = batch;
+    activityMarker = page.marker || null;
+    activityDone = !page.marker;
+  } else if (!older) {
+    var seen = {};
+    var fresh = [];
+    for (var i = 0; i < activityRows.length; i++) {
+      var key = txKey(activityRows[i]);
+      if (key) seen[key] = 1;
+    }
+    for (var j = 0; j < batch.length; j++) {
+      var id = txKey(batch[j]);
+      if (id && seen[id]) continue;
+      fresh.push(batch[j]);
+    }
+    if (fresh.length) activityRows = fresh.concat(activityRows);
+  } else {
+    var before = activityRows.length;
+    var have = {};
+    for (var k = 0; k < activityRows.length; k++) {
+      var existing = txKey(activityRows[k]);
+      if (existing) have[existing] = 1;
+    }
+    for (var n = 0; n < batch.length; n++) {
+      var nextKey = txKey(batch[n]);
+      if (nextKey && have[nextKey]) continue;
+      activityRows.push(batch[n]);
+    }
+    var nextMarker = page.marker || null;
+    var grew = activityRows.length > before;
+    if (!grew && sameMarker(nextMarker, activityMarker)) {
+      activityMarker = null;
+      activityDone = true;
+    } else {
+      activityOlder = true;
+      activityMarker = nextMarker;
+      activityDone = !nextMarker;
+    }
+  }
+  if (activityMoreNote) activityMoreNote.hidden = true;
+  return showActivity(activityRows);
+}
+
+function fetchActivity(marker) {
+  var query = { account: acct, limit: ACTIVITY_PAGE };
+  if (marker) query.marker = marker;
+  return rpc("account_tx", query);
+}
+
+function activityVisible() {
+  var panel = document.getElementById("activity");
+  if (!panel) return false;
+  if (phone) return panel.classList.contains("on");
+  var layout = document.getElementById("layout");
+  var view = layout && layout.dataset.view || "home";
+  return view === "home" || view === "activity";
+}
+
+function activityNearEnd() {
+  if (!activityList) return false;
+  var rect = activityList.getBoundingClientRect();
+  return rect.bottom - window.innerHeight < 480;
+}
+
+function refreshActivity() {
+  if (!acct) return Promise.resolve();
+  if (activityBusy) {
+    activityAgain = true;
+    return Promise.resolve();
+  }
+  activityBusy = true;
+  return fetchActivity(null).then(function (page) {
+    return applyActivityPage(page, false);
+  }).then(function () {
+    activityBusy = false;
+    if (activityAgain) {
+      activityAgain = false;
+      return refreshActivity();
+    }
+    moreActivity();
+  }, function (error) {
+    activityBusy = false;
+    if (activityAgain) {
+      activityAgain = false;
+      refreshActivity();
+    }
+    throw error;
+  });
+}
+
+function moreActivity() {
+  if (activityBusy || activityDone || !activityMarker || !activityVisible() || !activityNearEnd()) return;
+  activityBusy = true;
+  if (activityMoreNote) {
+    activityMoreNote.hidden = false;
+    activityMoreNote.textContent = t("loading");
+  }
+  fetchActivity(activityMarker).then(function (page) {
+    return applyActivityPage(page, true);
+  }).then(function () {
+    activityBusy = false;
+    if (activityAgain) {
+      activityAgain = false;
+      refreshActivity();
+      return;
+    }
+    moreActivity();
+  }, function () {
+    activityBusy = false;
+    if (activityMoreNote) activityMoreNote.hidden = true;
+    if (activityAgain) {
+      activityAgain = false;
+      refreshActivity();
+    }
+  });
+}
+
 let refreshing = false;
 let refreshAgain = false;
 function refreshHome() {
@@ -1651,9 +1789,7 @@ function refreshHome() {
   const infoP = rpc("account_info", { account: acct, ledger_index: "validated" }).then(function (info) {
     paintBalance(info.account_data.Balance);
   });
-  const txP = rpc("account_tx", { account: acct, limit: 8 }).then(function (page) {
-    return showActivity(page.transactions || []);
-  });
+  const txP = refreshActivity();
   const lineP = rpc("account_lines", { account: acct, ledger_index: "validated" }).then(function (page) {
     paintLines(page.lines || []);
   });
@@ -1722,6 +1858,7 @@ function show(which) {
   const tabs = document.querySelectorAll("nav.tabs button, nav.tabs a");
   for (let i = 0; i < tabs.length; i++) tabs[i].classList.toggle("on", tabs[i].dataset.panel === which);
   if (which === "transfer") paintTransfer();
+  if (which === "activity") moreActivity();
   if (nftOverlay && !nftOverlay.hidden && which !== "nfts" && which !== "activity") closeViewer();
 }
 
@@ -2126,10 +2263,12 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
     }
     activityList.append(txHead);
   }
-  activityPanel.append(heading("activity"), activityNote, activityList);
-  rpc("account_tx", { account: acct, limit: 8 }).then(function (page) {
-    return showActivity(page.transactions || []);
-  }).catch(function () { activityNote.textContent = "Activity is unavailable."; });
+  activityMoreNote = document.createElement("p");
+  activityMoreNote.className = "m";
+  activityMoreNote.hidden = true;
+  activityPanel.append(heading("activity"), activityNote, activityList, activityMoreNote);
+  window.addEventListener("scroll", moreActivity, { passive: true });
+  refreshActivity().catch(function () { activityNote.textContent = "Activity is unavailable."; });
 
   startOwnerFeeds();
   }
