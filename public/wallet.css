@@ -432,10 +432,26 @@ html[data-shell="desk"] .tx-main { font-size: 0.95rem; color: var(--text); }
   html[data-shell="desk"] .tx-main:empty { display: none; }
 }
 html[data-shell="desk"] main.sale { max-width: 72rem; margin: 0 auto; }
+html[data-shell="desk"] #shell { display: flex; align-items: stretch; min-height: 100vh; }
+html[data-shell="desk"] #shell > main.sale { flex: 1; min-width: 0; max-width: none; margin: 0; }
+html[data-shell="desk"] #nav { width: 15rem; flex: none; display: flex; flex-direction: column; gap: .25rem; padding: 1.1rem .75rem 1rem; border-right: 1px solid var(--line); position: sticky; top: 0; height: 100vh; box-sizing: border-box; }
+html[data-shell="desk"] #nav .brand { display: flex; flex-direction: column; gap: .15rem; padding: .25rem .85rem 1rem; }
+html[data-shell="desk"] #nav .brand span { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; }
+html[data-shell="desk"] #nav a.tab { display: block; width: 100%; box-sizing: border-box; margin: 0; padding: .7rem .85rem; border-radius: .7rem; background: transparent; color: var(--muted); font-weight: 650; text-align: left; text-decoration: none; }
+html[data-shell="desk"] #nav a.tab.on { background: var(--accent); color: var(--accent-ink); }
 .sale-direct { width: min(28rem, 100%); margin: 0 auto; }
-.sale-direct > h1, .sale-direct > .mono { text-align: center; }
+.sale-direct h1, .sale-direct .mono { text-align: center; }
 .sale-direct .mono { overflow-wrap: anywhere; }
+html[data-shell="desk"] .sale-direct { width: auto; margin: 0; display: grid; grid-template-columns: minmax(0, 28rem) minmax(16rem, 22rem); gap: 2.5rem; align-items: start; justify-content: start; }
+html[data-shell="desk"] .sale-direct h1, html[data-shell="desk"] .sale-direct .mono { text-align: left; }
+html[data-shell="desk"] .sale-actions { display: flex; flex-direction: column; align-items: stretch; gap: 0.75rem; }
+html[data-shell="desk"] .sale-actions .sale-links { justify-content: flex-start; }
+html[data-shell="phone"] .sale-qr { display: none; }
+html[data-shell="desk"] .sale-buy { display: none; }
+html[data-shell="phone"] a.sale-return { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: center; box-sizing: border-box; height: calc(2.75rem + env(safe-area-inset-bottom)); margin: 0; padding: 0 .4rem env(safe-area-inset-bottom); background: var(--nav); border-top: 1px solid var(--line); color: var(--text); font-weight: 700; text-decoration: none; }
+html[data-shell="phone"] body:has(a.sale-return) main.sale { padding-bottom: calc(4.2rem + env(safe-area-inset-bottom)); }
 .sale-one { width: min(22rem, 100%); margin: 0.4rem auto 1rem; }
+html[data-shell="desk"] .sale-one { margin-left: 0; margin-right: 0; }
 html[data-shell="phone"] main.sale .nft-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
 html[data-shell="phone"] main.sale .nft { border-radius: 0.85rem; }
 html[data-shell="phone"] main.sale .nft-body { padding: 0.45rem 0.5rem 0.55rem; font-size: 0.75rem; }

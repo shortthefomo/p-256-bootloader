@@ -1657,17 +1657,27 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
     } else addTab("shop", "shop", salePage(acct), true);
     addTab("settings", "settings");
     slot.append(tabs, layout);
-    if (passkey) show("transfer");
+    var section = (location.hash || "").replace(/^#/, "");
+    if (section === "shop") section = "nfts";
+    if (section === "settings") {
+      show("settings");
+      paintLedgerSettings();
+    } else if (passkey && (section === "nfts" || section === "activity")) show(section);
+    else if (passkey) show("transfer");
     else {
       show("settings");
       paintLedgerSettings();
     }
   } else {
     slot.append(layout);
-    if (wantSettings) {
+    var opened = (location.hash || "").replace(/^#/, "");
+    if (opened === "settings" || wantSettings) {
       layout.classList.add("settings-open");
       if (settingsButton) settingsButton.classList.add("on");
       paintLedgerSettings();
+    } else if (opened) {
+      var jump = document.getElementById(opened === "transfer" ? "send" : opened);
+      if (jump && jump.scrollIntoView) jump.scrollIntoView();
     }
   }
 }).catch(function () { $("g").textContent = "Hook state unavailable"; });

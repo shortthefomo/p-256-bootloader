@@ -25,10 +25,10 @@ import {
   xahToDrops,
 } from "../src/protocol.mjs";
 import { decodeImage, decodeQr, encodeQr, rasterQr } from "../src/qr.mjs";
-import { buyOfferLink, describeTx, kindFromTx, parseScan, payLink, requestLink, saleLink, samePayment, sameTransaction, shortAddress, tweetLink } from "../src/scan.mjs";
+import { buyOfferLink, describeTx, kindFromTx, parseScan, payLink, requestLink, saleLink, samePayment, sameTransaction, shortAddress, toolLink, tweetLink, walletLink } from "../src/scan.mjs";
 import { saleQuery, visibleSale } from "../src/sale-page.mjs";
 import { AMOUNT_FORMATS, LANGUAGES, canonicalAmount, formatDrops, translate } from "../src/locale.mjs";
-import { EXPLORER, HOOK_HASH, HOOK_ON, INTERFACE_REV, NAMESPACE, accountBytes, explorerUrls, feeCeiling, hookLevel, levelTx, safeReturn, stateValue, txUrl } from "../src/wallet.mjs";
+import { EXPLORER, HOOK_HASH, HOOK_ON, INTERFACE_REV, NAMESPACE, accountBytes, explorerUrls, feeCeiling, hookLevel, levelTx, pwaUrl, safeReturn, stateValue, txUrl } from "../src/wallet.mjs";
 import { createHash } from "node:crypto";
 import { generate, libraries } from "xrpl-accountlib";
 
@@ -384,6 +384,7 @@ const offerQr = buyOfferLink({ id: saleId, amount: "22000000" });
 const offerScan = parseScan(offerQr);
 const shopFn = saleSrc.slice(saleSrc.indexOf("function shop("), saleSrc.indexOf("function paint("));
 check("a listed token qr makes an offer", offerScan.type === "qr" && offerScan.kind === "URITokenBuy" && offerScan.values.id === saleId && offerScan.values.xah === "22" && offerScan.account === "" && offerQr.startsWith("https://shortthefomo.github.io/p-256-bootloader/?op=qr#") && buyOfferLink(heldToken) === "" && !shopFn.includes("codeBlock") && saleSrc.includes('say("nftOfferScan")') && !saleSrc.includes('say("nftScan")') && translate("en", "nftOfferScan") === "Scan this code to make an offer.");
+check("a shop item keeps the desktop menu and buys from the phone", saleSrc.includes('class: "sale-item"') && saleSrc.includes('class: "sale-actions"') && saleSrc.includes('class: "sale-qr"') && saleSrc.includes('class: "b sale-buy"') && saleSrc.includes('say("backToWallet")') && saleSrc.includes("walletLink(") && saleSrc.includes("toolLink(") && !saleSrc.includes("location.assign") && walletCss.includes('html[data-shell="phone"] .sale-qr') && walletCss.includes('html[data-shell="desk"] .sale-direct') && walletLink(account, "send") === `${pwaUrl(account)}#send` && walletLink(account) === pwaUrl(account) && toolLink(account, "scan").startsWith("https://shortthefomo.github.io/p-256-bootloader/?op=scan&") && signerApp.includes('op === "send"') && signerApp.includes('op === "activity"') && signerApp.includes("location.assign(pwaUrl(named))") && !signerApp.includes("walletHome(known)") && translate("en", "nftPurchase") === "Buy" && translate("en", "backToWallet") === "Return to wallet" && translate("fr", "backToWallet") === "Retour au portefeuille");
 check("sale query keeps a shop or one token", saleQuery(`?account=${account}`)?.id === "" && saleQuery(`?account=${account}&id=${saleId}`)?.id === saleId && saleQuery(`?account=${account}&id=zz`) == null && saleQuery("?account=nope") == null);
 check("kind from trustset", kindFromTx({ TransactionType: "TrustSet", LimitAmount: { currency: "USD", issuer: account, value: "5" } })?.kind === "TrustSet");
 check("payment watch matches drops", samePayment(

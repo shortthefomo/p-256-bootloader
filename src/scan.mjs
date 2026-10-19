@@ -139,6 +139,26 @@ export function requestLink({ page, account, kind, values, returnTo = "" }) {
 }
 
 const SIGNER_PAGE = "https://shortthefomo.github.io/p-256-bootloader/";
+const WALLET_HOST = "https://pwa.passkey.xahau-dev.net";
+
+// The working wallet is the account page. A section name is a hash on that
+// page. This host only creates a wallet, attaches the bootloader, or signs.
+export function walletLink(account, op = "") {
+  if (!isAddress(account)) return "";
+  const base = `${WALLET_HOST}/${account}`;
+  if (!op || op === "home" || op === "shop") return base;
+  return `${base}#${op}`;
+}
+
+// Camera and Face ID cannot run inside the sandboxed account page.
+export function toolLink(account, op) {
+  if (!isAddress(account) || !op) return "";
+  const url = new URL(SIGNER_PAGE);
+  url.searchParams.set("op", op);
+  url.searchParams.set("account", account);
+  url.searchParams.set("return", `${WALLET_HOST}/${account}`);
+  return url.href;
+}
 
 // A listed token's QR is the buy the scanner signs. The buyer is chosen
 // when the code is scanned, so the seller's account stays out of it.

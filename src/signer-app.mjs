@@ -164,7 +164,7 @@ function themeButton() {
   }, [themeLabel()]);
 }
 
-function screen(title, nodes, mode = "") {
+function screen(title, nodes) {
   stopCamera();
   stopWatch();
   stopWatch = () => {};
@@ -174,11 +174,18 @@ function screen(title, nodes, mode = "") {
     el("header", { class: "top" }, shell() === "phone" ? [heading, themeButton()] : [heading]),
     el("div", { class: "view" }, nodes.filter(Boolean)),
   );
-  if (mode) renderNav(mode);
-  else {
-    nav.hidden = true;
-    nav.replaceChildren();
-  }
+  nav.hidden = true;
+  nav.replaceChildren();
+}
+
+function walletReturn(account) {
+  return safeReturn(params.get("return") || "", account) || (isAddress(account) ? pwaUrl(account) : "");
+}
+
+function walletReturnLink(account) {
+  const next = walletReturn(account);
+  if (!next) return null;
+  return el("a", { class: "b g", href: next }, [text("backToWallet")]);
 }
 
 async function pageIsStale(account) {
@@ -648,9 +655,13 @@ function composer({ account, back }) {
   const body = [kindSelect, fields, review, el("button", {
     class: "link",
     type: "button",
-    onclick: () => sendForm(account),
-  }, ["Back to send"])];
-  screen("Other transaction", shell() === "desk" ? [el("div", { class: "card form" }, body)] : body, shell() === "phone" ? "transfer" : "send");
+    onclick: () => {
+      const next = walletReturn(account);
+      if (next) location.assign(next);
+      else home();
+    },
+  }, [text("backToWallet")])];
+  screen("Other transaction", shell() === "desk" ? [el("div", { class: "card form" }, body)] : body);
   review.addEventListener("click", () => {
     const values = Object.fromEntries([...inputs].map(([key, input]) => [key, input.value]));
     try {
@@ -781,9 +792,10 @@ function settings(account, section = "version") {
   }, [text(id)]);
   const body = el("div", { class: "settings" });
   screen(text("settings"), [
+    walletReturnLink(account),
     el("div", { class: "seg" }, [seg("version"), seg("general")]),
     body,
-  ], "settings");
+  ].filter(Boolean));
   if (section === "general") paintGeneral(body, account);
   else paintVersion(body, account);
 }
@@ -1479,11 +1491,12 @@ function payScreen(account, mode, nodes) {
 function sendForm(account, dest = "", amount = "") {
   rememberAccount(account);
   const body = sendBody(account, dest, amount);
+  const back = walletReturnLink(account);
   if (shell() === "phone") {
-    payScreen(account, "send", body);
+    payScreen(account, "send", back ? [back, ...body] : body);
     return;
   }
-  screen(text("send"), [el("div", { class: "card form" }, body)], "send");
+  screen(text("send"), [back, el("div", { class: "card form" }, body)].filter(Boolean));
 }
 
 function receiveParts(account) {
@@ -1523,11 +1536,12 @@ function receiveParts(account) {
 function receive(account) {
   rememberAccount(account);
   const parts = receiveParts(account);
+  const back = walletReturnLink(account);
   if (shell() === "phone") {
-    payScreen(account, "receive", parts);
+    payScreen(account, "receive", back ? [back, ...parts] : parts);
     return;
   }
-  screen(text("receive"), [el("div", { class: "split card" }, parts)], "receive");
+  screen(text("receive"), [back, el("div", { class: "split card" }, parts)].filter(Boolean));
 }
 
 async function listedTokens(account) {
@@ -2217,9 +2231,10 @@ function scan(account) {
   const pasted = el("input", { type: "text", placeholder: text("pastePlaceholder"), autocomplete: "off", spellcheck: "false" });
   const open = el("button", { class: "ghost", type: "button" }, [text("open")]);
   const paste = el("div", { class: "paste" }, [pasted, open]);
+  const back = walletReturnLink(account);
   screen(text("scan"), shell() === "desk"
-    ? [el("div", { class: "split scan-split" }, [finder, el("div", {}, [note, paste])])]
-    : [finder, note, paste], "scan");
+    ? [back, el("div", { class: "split scan-split" }, [finder, el("div", {}, [note, paste])])]
+    : [back, finder, note, paste]);
   const gen = viewGen;
   open.addEventListener("click", () => {
     if (pasted.value.trim()) take(pasted.value.trim());
@@ -2434,25 +2449,23 @@ function home() {
   const lock = el("input", { type: "checkbox" });
   lock.checked = true;
   const create = el("button", {}, ["Create a wallet"]);
-  const sign = el("button", {}, ["Open"]);
-  const use = el("button", { class: "ghost" }, ["Attach passkey"]);
+  const sign = el("button", {}, ["Open the wallet"]);
+  const use = el("button", { class: "ghost" }, ["Attach the firewall"]);
   const bad = originOk();
   const saved = savedAccount();
   if (saved) account.value = saved;
-  screen("Wallet", [
+  screen("Set up", [
     el("p", { class: "lede" }, [
-      shell() === "desk"
-        ? "A send shows a QR code. Your iPhone scans it and approves with Face ID."
-        : "Face ID approves each send. Scan reads a QR code from another screen.",
+      "Create a wallet, or attach the firewall bootloader to one you already have. The wallet opens on the account page. Face ID stays on this page only for that setup and for approving a transaction.",
     ]),
     bad ? el("p", { class: "warn" }, [bad]) : null,
     create,
     el("details", {}, [
-      el("summary", {}, ["I already have an account"]),
+      el("summary", {}, ["I already have a wallet"]),
       el("div", { class: "stack" }, [account, sign]),
     ]),
     el("details", {}, [
-      el("summary", {}, ["Attach a passkey to a seed"]),
+      el("summary", {}, ["Attach the firewall to a seed"]),
       el("div", { class: "stack" }, [
         seed,
         el("label", {}, [lock, el("span", {}, ["Lock the hook. A lost passkey cannot be replaced, and the seed cannot take the hook off."])]),
@@ -2462,12 +2475,12 @@ function home() {
   ]);
   sign.addEventListener("click", () => {
     const text = account.value.trim();
-    if (!/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(text)) {
+    if (!isAddress(text)) {
       fail(new Error("enter the account address"));
       return;
     }
     rememberAccount(text);
-    walletHome(text);
+    location.assign(pwaUrl(text));
   });
 
   create.addEventListener("click", async () => {
@@ -2513,6 +2526,21 @@ async function main() {
     return;
   }
   const op = params.get("op");
+  const named = params.get("account") || "";
+  if (!op && isAddress(named)) {
+    location.assign(pwaUrl(named));
+    return;
+  }
+  if (op === "send" || op === "activity" || (op === "nfts" && !(params.get("act") || ""))) {
+    const account = isAddress(named) ? named : savedAccount();
+    if (!isAddress(account)) {
+      home();
+      return;
+    }
+    const place = op === "nfts" ? "nfts" : op;
+    location.assign(`${pwaUrl(account)}#${place}`);
+    return;
+  }
   if (!globalThis.PublicKeyCredential && shell() === "phone" && op !== "scan" && op !== "receive" && op !== "settings" && op !== "update" && op !== "nfts") {
     screen("No passkeys here", [el("p", {}, ["This browser has no WebAuthn. Open the wallet in Safari on the iPhone."])]);
     return;
@@ -2610,7 +2638,7 @@ async function main() {
         openBuilt({ account, kind: "URITokenCreateSellOffer", values, back }).catch((error) => rejected(account, back, error));
         return;
       }
-      await uriTokens(account, { act, id });
+      location.assign(`${pwaUrl(account)}#nfts`);
       return;
     }
     if (op === "settings" || op === "update") {
@@ -2630,12 +2658,6 @@ async function main() {
         return;
       }
       await attach(existing, { account: params.get("account") || "", lock: true });
-      return;
-    }
-    const known = params.get("account") || savedAccount();
-    if (isAddress(known)) {
-      rememberAccount(known);
-      walletHome(known);
       return;
     }
     home();

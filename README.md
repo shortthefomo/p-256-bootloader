@@ -22,7 +22,7 @@ The stored origin has to be https and 8 to 64 characters.
 
 ## Wallet
 
-This repository is the wallet. GitHub Pages serves it. A phone lays out as a wallet with Home, Send, Scan, and Receive. A computer lays out as a wallet that shows a QR code. The iPhone scans that code, Face ID signs, and the firewall hook on the account accepts or rejects the submission. The on-ledger bootloader is the account page. Its sign button opens this wallet and returns when the transaction is in a ledger.
+GitHub Pages is the setup page and the Face ID step. It creates a wallet or attaches the firewall bootloader. It is not the address the wallet runs from. The wallet is the account page at `https://pwa.passkey.xahau-dev.net/<account>`. A phone lays out as a wallet there. A computer shows a QR code for a send. The iPhone opens this site only to approve with Face ID, then returns to the account page.
 
 Push the repository to GitHub and turn on Pages (the `pages` workflow publishes the site). The site origin, such as `https://shortthefomo.github.io`, must be 64 characters or fewer. `github.io` is a public suffix, so the passkey belongs to that full host. Open the Pages URL in Safari on the iPhone.
 
@@ -32,7 +32,7 @@ Push the repository to GitHub and turn on Pages (the `pages` workflow publishes 
 - **Open this account** shows the balance, recent activity, send, and receive. On a computer, send shows a QR code for the iPhone. On the phone, Face ID signs, and Scan reads a QR from the computer, an address, or a Xaman detect link.
 - **Sign a transaction** builds a payment, trust line, offer, escrow, check, domain change, regular key, preauthorization, tickets, invoke, or account delete. Face ID signs it and the wallet submits it.
 
-The bootloader then lives at `https://pwa.passkey.xahau-dev.net/<account>`. A payment there comes back here. **Other transactions** opens the full form. Open the wallet at https://shortthefomo.github.io/p-256-bootloader/.
+Open https://shortthefomo.github.io/p-256-bootloader/ to create a wallet or attach the firewall. After that, the wallet is `https://pwa.passkey.xahau-dev.net/<account>`. A payment collected there comes back to this site for Face ID, then returns to the account page. **Other transactions** opens the full form on this site for the same approval.
 
 ## Levels
 

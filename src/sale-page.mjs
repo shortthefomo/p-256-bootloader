@@ -5,7 +5,7 @@
 import { translate, LANGUAGES } from "./locale.mjs";
 import { dropsToXah } from "./protocol.mjs";
 import { encodeQr } from "./qr.mjs";
-import { buyOfferLink, isAddress, saleLink, shortAddress, tweetLink } from "./scan.mjs";
+import { buyOfferLink, isAddress, saleLink, shortAddress, toolLink, tweetLink, walletLink } from "./scan.mjs";
 import { cardArt, normalizeUriToken } from "./uri-tokens.mjs";
 
 const WSS = "wss://passkey.xahau-dev.net";
@@ -248,25 +248,30 @@ function oneToken(account, token, say) {
   const page = saleLink(account, token.id);
   const message = forSale ? `${title} · ${say("nftTweet")}` : title;
   return [el("div", { class: "sale-direct" }, [
-    el("h1", {}, [title]),
-    el("p", { class: "m mono" }, [account]),
-    el("div", { class: forSale ? "nft listed sale-one" : "nft held sale-one" }, [
-      tokenArt(token, title),
-      el("div", { class: "nft-body" }, [
-        el("strong", {}, [title]),
-        token.edition ? el("span", { class: "nft-edition" }, [`${say("nftEdition")} ${token.edition}`]) : null,
-        el("p", { class: "nft-status" }, [
-          el("span", { class: "nft-state" }, [forSale ? say("nftForSale") : say("nftNotForSale")]),
-          forSale && price ? el("span", { class: "nft-pricebit" }, [price]) : null,
+    el("div", { class: "sale-item" }, [
+      el("h1", {}, [title]),
+      el("p", { class: "m mono" }, [account]),
+      el("div", { class: forSale ? "nft listed sale-one" : "nft held sale-one" }, [
+        tokenArt(token, title),
+        el("div", { class: "nft-body" }, [
+          el("strong", {}, [title]),
+          token.edition ? el("span", { class: "nft-edition" }, [`${say("nftEdition")} ${token.edition}`]) : null,
+          el("p", { class: "nft-status" }, [
+            el("span", { class: "nft-state" }, [forSale ? say("nftForSale") : say("nftNotForSale")]),
+            forSale && price ? el("span", { class: "nft-pricebit" }, [price]) : null,
+          ]),
         ]),
       ]),
+      token.destination ? el("p", { class: "m" }, [shortAddress(token.destination)]) : null,
+      token.id ? tokenIdBlock(token.id, say) : null,
     ]),
-    token.destination ? el("p", { class: "m" }, [shortAddress(token.destination)]) : null,
-    token.id ? tokenIdBlock(token.id, say) : null,
-    offer ? codeBlock(offer, say) : null,
-    el("div", { class: "sale-links" }, [
-      page ? shareAnchor(page, say("nftShare"), message) : null,
-      el("a", { class: "b g", href: saleLink(account) }, [say("nftShop")]),
+    el("div", { class: "sale-actions" }, [
+      offer ? el("div", { class: "sale-qr" }, [codeBlock(offer, say)]) : null,
+      offer ? el("a", { class: "b sale-buy", href: offer }, [say("nftPurchase")]) : null,
+      el("div", { class: "sale-links" }, [
+        page ? shareAnchor(page, say("nftShare"), message) : null,
+        el("a", { class: "b g", href: saleLink(account) }, [say("nftShop")]),
+      ]),
     ]),
   ])];
 }
@@ -284,24 +289,67 @@ function shop(account, tokens, say) {
   ];
 }
 
+function savedShopAccount() {
+  try {
+    const value = localStorage.getItem("p256-account") || "";
+    return isAddress(value) ? value : "";
+  } catch {
+    return "";
+  }
+}
+
+function signerNav(account, say) {
+  const items = [
+    ["home", ""],
+    ["send", "send"],
+    ["receive", "receive"],
+    ["nfts", "nfts"],
+    ["shop", "shop"],
+    ["activity", "activity"],
+    ["scan", "scan"],
+    ["settings", "settings"],
+  ];
+  return el("nav", { id: "nav" }, [
+    el("div", { class: "brand" }, [
+      el("strong", {}, ["Xahau"]),
+      el("span", {}, [shortAddress(account)]),
+    ]),
+    ...items.map(([key, op]) => el("a", {
+      class: key === "shop" ? "tab on" : "tab",
+      href: key === "shop" ? saleLink(account) : key === "scan" ? toolLink(account, "scan") : walletLink(account, op),
+    }, [say(key)])),
+  ]);
+}
+
+function show(root, account, say, nodes) {
+  const content = nodes.filter((node) => node != null && node !== false);
+  const own = Boolean(account) && savedShopAccount() === account;
+  const phone = document.documentElement.dataset.shell === "phone";
+  if (own && phone) {
+    content.unshift(el("a", { class: "sale-return", href: walletLink(account) }, [say("backToWallet")]));
+  }
+  root.replaceChildren(...content);
+  if (own && !phone) document.body.replaceChildren(el("div", { id: "shell" }, [signerNav(account, say), root]));
+}
+
 function paint(root, say, query, tokens) {
   const shown = visibleSale(tokens, query.id);
   document.title = say(query.id ? "nftForSale" : "nftShop");
   if (query.id && !shown.length) {
-    root.replaceChildren(
+    show(root, query.account, say, [
       el("h1", {}, [say("nfts")]),
       el("p", { class: "m mono" }, [query.account]),
       el("p", {}, [say("nftMissing")]),
       el("div", { class: "sale-links" }, [
         el("a", { class: "b g", href: saleLink(query.account) }, [say("nftShop")]),
       ]),
-    );
+    ]);
     return;
   }
   const nodes = query.id
     ? oneToken(query.account, shown[0], say)
     : shop(query.account, shown, say);
-  root.replaceChildren(...nodes.filter((node) => node != null && node !== false));
+  show(root, query.account, say, nodes);
 }
 
 function boot() {
