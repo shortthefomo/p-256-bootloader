@@ -1567,7 +1567,7 @@ function collectItems(account, tokens, offers) {
 function galleryCard(item, onOpen) {
   const title = tokenTitle(item.token);
   const sale = priceLabel(item.token.amount);
-  return el("button", { class: item.offer ? "nft incoming" : "nft", type: "button", onclick: onOpen }, [
+  const card = el("button", { class: item.offer ? "nft incoming" : "nft", type: "button", onclick: onOpen }, [
     tokenArt(item.token, title),
     el("div", { class: "nft-body" }, [
       el("strong", {}, [title]),
@@ -1575,6 +1575,8 @@ function galleryCard(item, onOpen) {
       sale ? el("p", { class: "nft-sale" }, [`${text("nftForSale")} ${sale}`]) : null,
     ]),
   ]);
+  if (item.offer) card.append(el("span", { class: "nft-badge" }, [text("nftOffer")]));
+  return card;
 }
 
 function showNftBrowser(account, items, focus) {
@@ -1604,9 +1606,39 @@ function showNftBrowser(account, items, focus) {
       el("div", { class: "nft-pager" }, [prev, count, next]),
     ]),
   ]);
+  let swipeX = 0;
+  let swipeY = 0;
+  let swiping = false;
+  let ignoreClick = false;
   overlay.addEventListener("click", (event) => {
+    if (ignoreClick) {
+      ignoreClick = false;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (event.target === overlay) closeOverlay();
-  });
+  }, true);
+  overlay.addEventListener("touchstart", (event) => {
+    if (shell() !== "phone" || event.touches.length !== 1) return;
+    const tag = event.target?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON" || tag === "A") return;
+    swipeX = event.touches[0].clientX;
+    swipeY = event.touches[0].clientY;
+    swiping = true;
+  }, { passive: true });
+  overlay.addEventListener("touchend", (event) => {
+    if (!swiping) return;
+    swiping = false;
+    const touch = event.changedTouches[0];
+    if (!touch || items.length < 2) return;
+    const dx = touch.clientX - swipeX;
+    const dy = touch.clientY - swipeY;
+    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return;
+    ignoreClick = true;
+    openAt(index + (dx < 0 ? 1 : -1), false);
+  }, { passive: true });
+  overlay.addEventListener("touchcancel", () => { swiping = false; }, { passive: true });
 
   function closeOverlay() {
     overlay.hidden = true;
@@ -1638,7 +1670,9 @@ function showNftBrowser(account, items, focus) {
     const title = tokenTitle(token);
     const sale = priceLabel(token.amount);
     stage.replaceChildren(tokenArt(token, title));
+    if (offer) stage.append(el("span", { class: "nft-badge" }, [text("nftOffer")]));
     const lines = [el("strong", {}, [title])];
+    if (offer) lines.push(el("p", { class: "nft-offer" }, [text("nftOffer")]));
     if (token.edition) lines.push(el("p", {}, [`${text("nftEdition")} ${token.edition}`]));
     if (sale) lines.push(el("p", {}, [`${text("nftForSale")} ${sale}`]));
     if (token.destination) lines.push(el("p", {}, [shortAddress(token.destination)]));
@@ -1686,7 +1720,13 @@ function showNftBrowser(account, items, focus) {
       }, [text("nftBurn")]));
     }
     actions.replaceChildren(...controls);
-    sellBox.replaceChildren(!offer && selling ? sellFields(account, token.id) : null);
+    if (!offer && selling) {
+      sellBox.hidden = false;
+      sellBox.replaceChildren(sellFields(account, token.id));
+    } else {
+      sellBox.replaceChildren();
+      sellBox.hidden = true;
+    }
     count.textContent = text("nftCount", { n: index + 1, m: items.length });
     prev.disabled = items.length < 2;
     next.disabled = items.length < 2;

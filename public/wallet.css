@@ -127,7 +127,7 @@ details.raw pre.json { margin: 0; border: 0; border-radius: 0; border-top: 1px s
 }
 a.tx { cursor: pointer; color: inherit; text-decoration: none; }
 .nft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); gap: 0.9rem; margin: 0.4rem 0 1rem; }
-.nft { display: flex; flex-direction: column; min-width: 0; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); overflow: hidden; }
+.nft { position: relative; display: flex; flex-direction: column; min-width: 0; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); overflow: hidden; }
 .nft-art { display: flex; align-items: center; justify-content: center; aspect-ratio: 5 / 7; background: var(--surface-2); }
 .nft-art img { width: 100%; height: 100%; object-fit: contain; background: transparent; }
 .nft-fallback { padding: 1rem; color: var(--muted); font-size: 0.85rem; font-weight: 650; text-align: center; overflow-wrap: anywhere; }
@@ -135,18 +135,23 @@ a.tx { cursor: pointer; color: inherit; text-decoration: none; }
 .nft-body strong, .nft .mono { display: block; overflow-wrap: anywhere; }
 .nft-body p { margin: 0.25rem 0; }
 .nft-sale { font-weight: 650; }
+.nft-offer { margin: 0.25rem 0; color: var(--warn); font-weight: 700; }
 button.nft { display: flex; flex-direction: column; width: 100%; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); color: inherit; font: inherit; font-weight: 400; text-align: left; cursor: pointer; }
 button.nft strong { font-weight: 650; }
+.nft.incoming { border-color: #ffd38a; box-shadow: inset 0 0 0 1px #ffd38a; }
+.nft-badge { position: absolute; top: 0.55rem; left: 0.55rem; z-index: 1; padding: 0.18rem 0.5rem; border-radius: 999px; background: #ffd38a; color: #1a1204; font-size: 0.72rem; font-weight: 700; line-height: 1.2; pointer-events: none; }
 .nft-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .nft-actions a.b { width: auto; display: inline-block; margin: 0.35rem 0 0; padding: 0.45rem 0.75rem; }
 .nft-overlay { position: fixed; inset: 0; z-index: 40; display: flex; align-items: safe center; justify-content: center; box-sizing: border-box; padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)); background: rgba(6, 8, 12, 0.84); overflow: auto; }
+html[data-shell="phone"] .nft-overlay { background: #0c0f14; padding: calc(0.75rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom)); touch-action: pan-y; }
 .nft-overlay[hidden] { display: none !important; }
 .nft-dialog { width: min(22rem, 100%); margin: auto; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
-.nft-stage { width: min(20rem, 86vw); }
+.nft-stage { position: relative; width: min(20rem, 86vw); }
 .nft-overlay .nft-art { width: 100%; border-radius: 1.15rem; background: transparent; }
 .nft-caption { color: #f4f7fb; text-align: center; }
 .nft-caption strong { display: block; }
 .nft-caption p { margin: 0.15rem 0; color: #d5deea; }
+.nft-caption .nft-offer { color: #ffd38a; }
 .nft-overlay-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; width: 100%; }
 .nft-overlay-actions button, .nft-overlay-actions a.b { width: auto; margin: 0; padding: 0.7rem 1rem; }
 .nft-pager { display: flex; align-items: center; justify-content: center; gap: 0.85rem; color: #f4f7fb; }
@@ -156,6 +161,7 @@ button.nft-close { align-self: flex-end; height: 2rem; padding: 0 0.75rem; borde
 button.nft-step { width: 2.25rem; height: 2.25rem; border-radius: 999px; font-size: 1.2rem; line-height: 1; }
 button.nft-step:disabled { opacity: 0.35; }
 html:has(.nft-overlay:not([hidden])) { overflow: hidden; }
+html[data-shell="phone"]:has(.nft-overlay:not([hidden])) .nft-grid { visibility: hidden; }
 .tx-type { grid-area: type; font-weight: 650; font-size: 1rem; color: var(--text); }
 .tx-main {
   grid-area: main;
