@@ -149,6 +149,7 @@
   .nft details { margin: 0.55rem 0 0; }
   .nft-overlay { position: fixed; inset: 0; z-index: 40; display: flex; align-items: safe center; justify-content: center; box-sizing: border-box; padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)); background: rgba(6, 8, 12, 0.84); overflow: auto; }
   html[data-shell="phone"] .nft-overlay { background: #0c0f14; padding: calc(0.75rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom)); touch-action: pan-y; }
+  html[data-shell="desk"] .nft-overlay { background: #0c0f14; }
   .nft-overlay[hidden] { display: none !important; }
   .nft-dialog { width: min(22rem, 100%); margin: auto; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
   .nft-sheet { width: 100%; overflow: hidden; }
@@ -191,6 +192,7 @@
   button.nft-step:disabled { opacity: 0.35; }
   html:has(.nft-overlay:not([hidden])) { overflow: hidden; }
   html[data-shell="phone"]:has(.nft-overlay:not([hidden])) .nft-grid { visibility: hidden; }
+  html[data-shell="desk"]:has(.nft-overlay:not([hidden])) .nft-grid { visibility: hidden; }
   .tx-type { grid-area: type; font-weight: 650; font-size: 1rem; color: var(--text); }
   .tx-main {
     grid-area: main;

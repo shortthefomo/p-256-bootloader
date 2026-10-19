@@ -31,7 +31,7 @@ import {
   xyFromAuthenticatorData,
   xyFromSpki,
 } from "./protocol.mjs";
-import { AMOUNT_FORMATS, LANGUAGES, canonicalAmount, formatDrops, translate } from "./locale.mjs";
+import { AMOUNT_FORMATS, LANGUAGES, browserLanguage, canonicalAmount, formatDrops, translate } from "./locale.mjs";
 import {
   FAUCET,
   HOOK_HASH,
@@ -119,7 +119,25 @@ function preference(key, allowed, fallback) {
 }
 
 function language() {
-  return preference(LANG_KEY, LANGUAGES.map((item) => item.id), "en");
+  const ids = LANGUAGES.map((item) => item.id);
+  const saved = preference(LANG_KEY, ids, "");
+  let id = saved;
+  if (!id) {
+    let list = [];
+    try {
+      list = navigator.languages ? Array.from(navigator.languages) : [navigator.language || ""];
+    } catch {
+      list = [];
+    }
+    id = browserLanguage(list);
+  }
+  try {
+    document.documentElement.lang = id;
+    document.title = translate(id, "wallet") + " · Xahau";
+  } catch {
+    // The page still renders when there is no document.
+  }
+  return id;
 }
 
 function amountFormat() {
@@ -236,12 +254,8 @@ function say(parent, text, className = "muted") {
 
 function originOk() {
   const origin = location.origin;
-  if (location.protocol !== "https:") {
-    return "Open https://shortthefomo.github.io/p-256-bootloader/ in Safari. Face ID needs that https origin.";
-  }
-  if (origin.length < 8 || origin.length > 64) {
-    return `This origin is ${origin.length} characters. The hook stores origins of 8 to 64 characters, and this one does not fit.`;
-  }
+  if (location.protocol !== "https:") return text("httpsRequired");
+  if (origin.length < 8 || origin.length > 64) return text("originLength", { length: origin.length });
   return "";
 }
 
@@ -2229,7 +2243,6 @@ function phoneScanNav(account) {
     ["transfer", "transfer"],
     ["scan", ""],
     ["nfts", "nfts"],
-    ["shop", "shop"],
     ["activity", "activity"],
     ["settings", "settings"],
   ];
@@ -2535,43 +2548,41 @@ async function login(account) {
 }
 
 function home() {
-  const account = el("input", { type: "text", placeholder: "Account r…", autocomplete: "off", spellcheck: "false" });
-  const seed = el("input", { type: "password", placeholder: "Family seed s…", autocomplete: "off", spellcheck: "false" });
+  const account = el("input", { type: "text", placeholder: text("accountPlaceholder"), autocomplete: "off", spellcheck: "false" });
+  const seed = el("input", { type: "password", placeholder: text("seedPlaceholder"), autocomplete: "off", spellcheck: "false" });
   const lock = el("input", { type: "checkbox" });
   lock.checked = true;
-  const create = el("button", {}, ["Create a wallet"]);
-  const sign = el("button", {}, ["Open the wallet"]);
-  const use = el("button", { class: "ghost" }, ["Attach the firewall"]);
+  const create = el("button", {}, [text("createWallet")]);
+  const sign = el("button", {}, [text("openWallet")]);
+  const use = el("button", { class: "ghost" }, [text("attachFirewall")]);
   const bad = originOk();
   const saved = savedAccount();
   if (saved) account.value = saved;
-  screen("Set up", [
-    el("p", { class: "lede" }, [
-      "Create a wallet, or attach the firewall bootloader to one you already have. The wallet opens on the account page. Face ID stays on this page only for that setup and for approving a transaction.",
-    ]),
+  screen(text("setup"), [
+    el("p", { class: "lede" }, [text("setupLede")]),
     bad ? el("p", { class: "warn" }, [bad]) : null,
     create,
     el("details", {}, [
-      el("summary", {}, ["I already have a wallet"]),
+      el("summary", {}, [text("haveWallet")]),
       el("div", { class: "stack" }, [account, sign]),
     ]),
     el("details", {}, [
-      el("summary", {}, ["Attach the firewall to a seed"]),
+      el("summary", {}, [text("attachSeed")]),
       el("div", { class: "stack" }, [
         seed,
-        el("label", {}, [lock, el("span", {}, ["Lock the hook. A lost passkey cannot be replaced, and the seed cannot take the hook off."])]),
+        el("label", {}, [lock, el("span", {}, [text("lockHook")])]),
         use,
       ]),
     ]),
   ]);
   sign.addEventListener("click", () => {
-    const text = account.value.trim();
-    if (!isAddress(text)) {
-      fail(new Error("enter the account address"));
+    const typed = account.value.trim();
+    if (!isAddress(typed)) {
+      fail(new Error(text("enterAccount")));
       return;
     }
-    rememberAccount(text);
-    location.assign(`${location.origin}${location.pathname}?op=login&account=${encodeURIComponent(text)}`);
+    rememberAccount(typed);
+    location.assign(`${location.origin}${location.pathname}?op=login&account=${encodeURIComponent(typed)}`);
   });
 
   create.addEventListener("click", async () => {
@@ -2581,12 +2592,12 @@ function home() {
       const response = await fetch(FAUCET, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
       const body = await response.json();
       const secret = body.account?.secret;
-      if (!secret) throw new Error(body.error || "the faucet did not return a wallet");
-      screen("Save this seed", [
-        el("p", {}, ["This is the account key. The iPhone is required on top of it. Write the seed down, then continue."]),
+      if (!secret) throw new Error(body.error || text("faucetEmpty"));
+      screen(text("saveSeed"), [
+        el("p", {}, [text("saveSeedHint")]),
         el("p", { class: "mono" }, [secret]),
         el("p", { class: "muted" }, [body.account.classicAddress || body.account.address || ""]),
-        el("button", { onclick: () => attach(secret, { lock: lock.checked }).catch(fail) }, ["I saved the seed. Attach iPhone."]),
+        el("button", { onclick: () => attach(secret, { lock: lock.checked }).catch(fail) }, [text("savedSeed")]),
       ]);
     } catch (error) {
       create.disabled = false;
@@ -2596,16 +2607,16 @@ function home() {
 
   use.addEventListener("click", () => {
     const secret = seed.value.trim();
-    if (!secret) return fail(new Error("paste the family seed"));
+    if (!secret) return fail(new Error(text("pasteSeed")));
     if (bad) return fail(new Error(bad));
     attach(secret, { account: params.get("account") || "", lock: lock.checked }).catch(fail);
   });
 }
 
 function fail(error) {
-  screen("Stopped", [
+  screen(text("stopped"), [
     el("p", {}, [error.message || String(error)]),
-    el("button", { class: "ghost", onclick: () => location.assign(location.pathname) }, ["Start again"]),
+    el("button", { class: "ghost", onclick: () => location.assign(location.pathname) }, [text("startAgain")]),
   ]);
 }
 
@@ -2613,7 +2624,7 @@ async function main() {
   applyShell();
   sessionStorage.removeItem(SEED_KEY);
   if (!globalThis.XrplAccountLib) {
-    screen("Signer is incomplete", [el("p", {}, ["The signing library did not load."])]);
+    screen(text("signerIncomplete"), [el("p", {}, [text("signerMissing")])]);
     return;
   }
   const op = params.get("op");
@@ -2642,7 +2653,7 @@ async function main() {
     return;
   }
   if (!globalThis.PublicKeyCredential && shell() === "phone" && op !== "scan" && op !== "receive" && op !== "settings" && op !== "update" && op !== "nfts") {
-    screen("No passkeys here", [el("p", {}, ["This browser has no WebAuthn. Open the wallet in Safari on the iPhone."])]);
+    screen(text("noPasskeys"), [el("p", {}, [text("noPasskeysHint")])]);
     return;
   }
   try {

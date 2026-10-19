@@ -2,7 +2,7 @@
 // one-shot websocket: the HTTP RPC does not send browser CORS headers. The QR
 // is always the GitHub Pages URL, so a scan from a preview still opens this page.
 
-import { translate, LANGUAGES } from "./locale.mjs";
+import { browserLanguage, translate, LANGUAGES } from "./locale.mjs";
 import { dropsToXah } from "./protocol.mjs";
 import { encodeQr } from "./qr.mjs";
 import { buyOfferLink, isAddress, saleLink, shortAddress, toolLink, tweetLink, walletLink } from "./scan.mjs";
@@ -31,9 +31,15 @@ function language() {
     const value = localStorage.getItem("p256-lang");
     if (LANGUAGES.some((item) => item.id === value)) return value;
   } catch {
-    // The public page stays in English when storage is blocked.
+    // Storage can be blocked. The browser language is still available.
   }
-  return "en";
+  let list = [];
+  try {
+    list = navigator.languages ? Array.from(navigator.languages) : [navigator.language || ""];
+  } catch {
+    list = [];
+  }
+  return browserLanguage(list);
 }
 
 function openSocket() {

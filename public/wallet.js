@@ -599,7 +599,7 @@ function putHash(patch) {
 
 function viewFromHash() {
   var raw = (location.hash || "").replace(/^#/, "");
-  if (tokenFocus() || raw.indexOf("token=") >= 0) return "shop";
+  if (tokenFocus() || raw.indexOf("token=") >= 0) return "nfts";
   if (!raw || raw.indexOf("tx=") === 0 || raw.indexOf("err=") === 0) return "home";
   var named = raw;
   if (raw.indexOf("=") >= 0) {
@@ -609,17 +609,17 @@ function viewFromHash() {
     transferMode = named === "receive" ? "receive" : "send";
     return "transfer";
   }
+  if (named === "shop") return "nfts";
   if (["home", "nfts", "shop", "activity", "settings"].indexOf(named) >= 0) return named;
   return "home";
 }
 
 function showDesk(view) {
   var layout = document.getElementById("layout");
-  var name = walletOwner ? (view || "home") : "shop";
+  var name = walletOwner ? (view || "home") : "nfts";
   if (layout) {
     layout.dataset.view = name;
     if (name === "settings") paintLedgerSettings();
-    if (name === "shop") paintShopList();
     if (name === "transfer") paintTransfer();
     if (nftOverlay && !nftOverlay.hidden && name !== "nfts" && name !== "home" && name !== "activity") closeViewer();
   }
@@ -663,9 +663,9 @@ function buildDeskNav(owner, passkey) {
   menu.className = "menu";
   var items = [];
   if (owner) {
-    items.push(deskItem("home"), deskItem("transfer"), deskItem("nfts"), deskItem("shop"), deskItem("activity"), deskItem("scan", href("scan")), deskItem("settings"), logoutControl("tab"));
+    items.push(deskItem("home"), deskItem("transfer"), deskItem("nfts"), deskItem("activity"), deskItem("scan", href("scan")), deskItem("settings"), logoutControl("tab"));
   } else {
-    items.push(deskItem("shop"));
+    items.push(deskItem("nfts"));
     if (passkey) items.push(deskItem("login", href("login")));
   }
   menu.append.apply(menu, items);
@@ -851,7 +851,7 @@ function paintShop() {
   for (var i = 0; i < all.length; i++) {
     if (!all[i].offer && tokenListed(all[i].object)) selling = true;
   }
-  var page = selling ? accountHome(acct, "shop") : "";
+  var page = selling ? accountHome(acct, "nfts") : "";
   nftShop.hidden = !page;
   if (!page) return;
   nftShop.href = tweetPage(page, t("nftTweet"));
@@ -899,7 +899,6 @@ function paintGallery() {
   nftNote.textContent = all.length ? (items.length ? "" : t("nftNoMatch")) : t("nftEmpty");
   for (let i = 0; i < items.length; i++) nftList.append(galleryButton(items[i]));
   if (nftOverlay && !nftOverlay.hidden && !ensureViewer()) closeViewer();
-  paintShopList();
 }
 
 function galleryButton(item) {
@@ -942,19 +941,6 @@ function galleryButton(item) {
   return button;
 }
 
-var shopList = null;
-var shopNote = null;
-var shopBody = null;
-
-function listedItems() {
-  var all = viewerItems();
-  var out = [];
-  for (var i = 0; i < all.length; i++) {
-    if (!all[i].offer && tokenListed(all[i].object)) out.push(all[i]);
-  }
-  return out;
-}
-
 function tokenFocus() {
   var raw = (location.hash || "").replace(/^#/, "");
   var id = "";
@@ -965,137 +951,26 @@ function tokenFocus() {
   return /^[0-9A-F]{64}$/.test(id) ? id : "";
 }
 
-function openShopToken(id) {
-  putHash({ view: "shop", token: id });
-  if (phone) show("shop");
-  else showDesk("shop");
-  paintShopList();
-}
-
-function shopCard(item) {
-  var face = tokenFace(item.object);
-  var button = document.createElement("button");
-  button.type = "button";
-  button.className = "nft listed";
-  var copy = document.createElement("div");
-  copy.className = "nft-body";
-  var title = document.createElement("strong");
-  title.textContent = face.title;
-  copy.append(title);
-  var shown = saleText(item.object.Amount);
-  var status = document.createElement("p");
-  status.className = "nft-status";
-  var state = document.createElement("span");
-  state.className = "nft-state";
-  state.textContent = t("nftForSale");
-  status.append(state);
-  if (shown) {
-    var priceBit = document.createElement("span");
-    priceBit.className = "nft-pricebit";
-    priceBit.textContent = shown;
-    status.append(priceBit);
+function focusToken() {
+  var id = tokenFocus();
+  if (!id) {
+    if (nftOverlay && !nftOverlay.hidden) closeViewer();
+    return;
   }
-  copy.append(status);
-  button.append(artFrame(face), copy);
-  var id = String(item.object.index || "").toUpperCase();
-  button.onclick = function () { if (id) openShopToken(id); };
-  return button;
-}
-
-function shopItem(item) {
-  var face = tokenFace(item.object);
-  var id = String(item.object.index || "").toUpperCase();
-  var offer = buyLink(item.object);
-  var page = accountHome(item.object.Owner || acct, "token=" + id);
-  var direct = document.createElement("div");
-  direct.className = "sale-direct";
-  var left = document.createElement("div");
-  left.className = "sale-item";
-  var title = document.createElement("h2");
-  title.textContent = face.title;
-  var owner = document.createElement("p");
-  owner.className = "m mono";
-  owner.textContent = item.object.Owner || acct;
-  var card = document.createElement("div");
-  card.className = tokenListed(item.object) ? "nft listed sale-one" : "nft held sale-one";
-  var body = document.createElement("div");
-  body.className = "nft-body";
-  var name = document.createElement("strong");
-  name.textContent = face.title;
-  body.append(name);
-  var shown = saleText(item.object.Amount);
-  if (shown) {
-    var price = document.createElement("p");
-    price.className = "nft-price";
-    price.textContent = shown;
-    body.append(price);
-  }
-  card.append(artFrame(face), body);
-  left.append(title, owner, card);
-  if (id) left.append(copyId(id));
-  var right = document.createElement("div");
-  right.className = "sale-actions";
-  if (offer) right.append(drawQr(offer));
-  if (offer) {
-    var buy = document.createElement("a");
-    buy.className = "b sale-buy";
-    buy.href = offer;
-    buy.textContent = t("nftPurchase");
-    right.append(buy);
-  }
-  var links = document.createElement("div");
-  links.className = "sale-links";
-  if (page) links.append(shareLink(page, t("nftShare"), face.title + " · " + t("nftTweet")));
-  var back = document.createElement("a");
-  back.className = "b g";
-  back.href = "#shop";
-  back.textContent = t("nftShop");
-  back.onclick = function (event) {
-    event.preventDefault();
-    putHash({ view: "shop" });
-    if (phone) show("shop");
-    else showDesk("shop");
-    paintShopList();
-  };
-  links.append(back);
-  right.append(links);
-  direct.append(left, right);
-  return direct;
-}
-
-function paintShopList() {
-  if (!shopList || !shopNote || !shopBody) return;
-  var focus = tokenFocus();
-  var items = listedItems();
-  shopList.replaceChildren();
-  shopBody.replaceChildren();
-  shopNote.textContent = "";
-  if (focus) {
-    var found = null;
-    var all = viewerItems();
-    for (var i = 0; i < all.length; i++) {
-      if (!all[i].offer && String(all[i].object.index || "").toUpperCase() === focus) found = all[i];
-    }
-    shopList.hidden = true;
-    if (!found) {
-      shopNote.textContent = ownedNodes.length ? t("nftMissing") : t("loading");
+  var all = viewerItems();
+  for (var i = 0; i < all.length; i++) {
+    if (String(all[i].object.index || "").toUpperCase() === id) {
+      openViewer(i);
       return;
     }
-    shopBody.append(shopItem(found));
-    return;
   }
-  shopList.hidden = false;
-  if (!items.length) {
-    shopNote.textContent = ownedNodes.length ? t("nftShopEmpty") : t("loading");
-    return;
-  }
-  for (var n = 0; n < items.length; n++) shopList.append(shopCard(items[n]));
+  if (ownedNodes.length && nftNote) nftNote.textContent = t("nftMissing");
 }
 
 function paintTokens(objects) {
   ownedNodes = objects || [];
   if (nftList) paintGallery();
-  else paintShopList();
+  if (tokenFocus()) focusToken();
 }
 
 var nftOverlay = null;
@@ -1128,7 +1003,7 @@ function ensureOverlay() {
       event.stopPropagation();
       return;
     }
-    if (event.target === nftOverlay) closeViewer();
+    if (event.target === nftOverlay) dismissViewer();
   }, true);
   nftOverlay.addEventListener("touchstart", function (event) {
     if (!phone || nftSliding || event.touches.length !== 1) return;
@@ -1186,7 +1061,7 @@ function ensureOverlay() {
   close.className = "nft-close";
   close.dataset.i18n = "nftClose";
   close.textContent = t("nftClose");
-  close.onclick = closeViewer;
+  close.onclick = dismissViewer;
   nftStage = document.createElement("div");
   nftStage.className = "nft-stage";
   nftCaption = document.createElement("div");
@@ -1223,7 +1098,7 @@ function ensureOverlay() {
     if (!nftOverlay || nftOverlay.hidden) return;
     var tag = event.target && event.target.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-    if (event.key === "Escape") closeViewer();
+    if (event.key === "Escape") dismissViewer();
     else if (event.key === "ArrowRight") stepViewer(1);
     else if (event.key === "ArrowLeft") stepViewer(-1);
   });
@@ -1233,6 +1108,11 @@ function closeViewer() {
   if (nftOverlay) nftOverlay.hidden = true;
   nftSliding = false;
   if (nftPage) placePage(0, false);
+}
+
+function dismissViewer() {
+  closeViewer();
+  if (tokenFocus()) putHash({ view: "nfts" });
 }
 
 function placePage(x, animate) {
@@ -1351,6 +1231,20 @@ function offerBox(id) {
   return box;
 }
 
+function buyerActions(object) {
+  var offer = buyLink(object);
+  if (!offer) return null;
+  var box = document.createElement("div");
+  box.className = "sale-actions";
+  box.append(drawQr(offer));
+  var buy = document.createElement("a");
+  buy.className = "b sale-buy";
+  buy.href = offer;
+  buy.textContent = t("nftPurchase");
+  box.append(buy);
+  return box;
+}
+
 function openViewer(index) {
   var items = viewerItems();
   if (!items.length) return;
@@ -1359,6 +1253,8 @@ function openViewer(index) {
   paintOverlay();
   nftOverlay.hidden = false;
   if (phone) show("nfts");
+  var tokenId = String(items[viewerPos].object.index || "").toUpperCase();
+  if (/^[0-9A-F]{64}$/.test(tokenId) && tokenFocus() !== tokenId) putHash({ token: tokenId });
 }
 
 function paintOverlay() {
@@ -1396,7 +1292,7 @@ function paintOverlay() {
   if (tokenId) nftCaption.append(copyId(tokenId));
   nftActions.replaceChildren();
   var id = String(item.object.index || "");
-  if (item.offer) {
+  if (walletOwner && item.offer) {
     nftActions.append(nftLink("nftAccept", { act: "buy", id: item.offer.id, xah: item.offer.xah }, false));
     var decline = document.createElement("button");
     decline.type = "button";
@@ -1412,17 +1308,20 @@ function paintOverlay() {
       else paintOverlay();
     };
     nftActions.append(decline);
-  } else {
+  } else if (walletOwner) {
     if (item.object.Amount) nftActions.append(nftLink("nftCancelSale", { act: "cancel", id: id }, true));
     nftActions.append(nftLink("nftBurn", { act: "burn", id: id }, true));
+  } else if (listed) {
+    var buying = buyerActions(item.object);
+    if (buying) nftActions.append(buying);
   }
   var owner = item.object.Owner || acct;
-  var shared = accountHome(owner, tokenId ? "token=" + tokenId : "shop");
+  var shared = accountHome(owner, tokenId ? "token=" + tokenId : "nfts");
   if (shared) {
     var blurb = item.offer || listed ? face.title + " · " + t("nftTweet") : face.title;
     nftActions.append(shareLink(shared, t("nftShare"), blurb));
   }
-  if (!item.offer) nftActions.append(offerBox(id));
+  if (walletOwner && !item.offer) nftActions.append(offerBox(id));
   var list = filteredItems();
   var placeInList = itemIndex(list, item);
   if (placeInList < 0) placeInList = 0;
@@ -2116,6 +2015,8 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
     return showActivity(page.transactions || []);
   }).catch(function () { activityNote.textContent = "Activity is unavailable."; });
 
+  startOwnerFeeds();
+  }
   nftPanel = panel("nfts");
   nftNote = document.createElement("p");
   nftNote.className = "m";
@@ -2135,27 +2036,16 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
   nftShop.hidden = true;
   filterBar.append(nftFilters, nftIssuers, nftShop);
   nftPanel.append(heading("nfts"), filterBar, nftNote, nftList);
-  startOwnerFeeds();
-  }
-  const shopPanel = panel("shop");
-  shopNote = document.createElement("p");
-  shopNote.className = "m";
-  shopNote.textContent = t("loading");
-  shopList = document.createElement("div");
-  shopList.className = "nft-grid";
-  shopBody = document.createElement("div");
-  shopPanel.append(heading("shop"), shopNote, shopList, shopBody);
   rpc("account_objects", { account: acct, type: "uri_token", ledger_index: "validated" }).then(function (page) {
     paintTokens(page.account_objects || []);
   }).catch(function () {
     if (nftNote) nftNote.textContent = t("nftUnavailable");
-    if (shopNote) shopNote.textContent = t("nftUnavailable");
   });
 
   const layout = document.createElement("div");
   layout.id = "layout";
-  if (walletOwner) layout.append(activityPanel, transferPanel, nftPanel);
-  layout.append(shopPanel);
+  if (walletOwner) layout.append(activityPanel, transferPanel);
+  layout.append(nftPanel);
   if (walletOwner) layout.append(settingsPanel);
   if (phone) {
     const tabs = document.createElement("nav");
@@ -2178,7 +2068,6 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
         putHash({ view: id === "transfer" ? "send" : id });
         show(id);
         if (id === "settings") paintLedgerSettings();
-        if (id === "shop") paintShopList();
       };
       tabs.append(button);
     }
@@ -2186,11 +2075,10 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
       addTab("transfer", "transfer");
       addTab("scan", "scan", href("scan"));
       addTab("nfts", "nfts");
-      addTab("shop", "shop");
       addTab("activity", "activity");
       addTab("settings", "settings");
     } else {
-      addTab("shop", "shop");
+      addTab("nfts", "nfts");
       if (passkey) {
         const loginLink = document.createElement("a");
         loginLink.href = href("login");
@@ -2202,41 +2090,34 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
       }
     }
     slot.append(tabs, layout);
-    if (!walletOwner) {
-      show("shop");
-      paintShopList();
-    } else {
+    if (!walletOwner) show("nfts");
+    else {
       var section = viewFromHash();
       if (section === "settings") {
         show("settings");
         paintLedgerSettings();
-      } else if (section === "shop") {
-        show("shop");
-        paintShopList();
-      } else if (section === "nfts" || section === "activity") show(section);
+      } else if (section === "nfts") show("nfts");
+      else if (section === "activity") show("activity");
       else if (section === "transfer") show("transfer");
       else show("activity");
     }
   } else {
     slot.append(layout);
     buildDeskNav(walletOwner, passkey);
-    showDesk(walletOwner ? viewFromHash() : "shop");
+    showDesk(viewFromHash());
   }
   window.addEventListener("hashchange", function () {
-    var view = walletOwner ? viewFromHash() : "shop";
+    var view = walletOwner ? viewFromHash() : "nfts";
     if (!phone) {
       showDesk(view);
-      return;
-    }
-    if (!walletOwner || view === "shop") {
-      show("shop");
-      paintShopList();
+      focusToken();
       return;
     }
     if (view === "settings") {
       show("settings");
       paintLedgerSettings();
     } else if (view === "nfts" || view === "activity" || view === "transfer") show(view);
-    else show("activity");
+    else show(walletOwner ? "activity" : "nfts");
+    focusToken();
   });
 }).catch(function () {});

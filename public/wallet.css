@@ -188,6 +188,7 @@ button.nft strong, a.nft strong { font-weight: 650; }
 .nft-actions a.b { width: auto; display: inline-block; margin: 0.35rem 0 0; padding: 0.45rem 0.75rem; }
 .nft-overlay { position: fixed; inset: 0; z-index: 40; display: flex; align-items: safe center; justify-content: center; box-sizing: border-box; padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)); background: rgba(6, 8, 12, 0.84); overflow: auto; }
 html[data-shell="phone"] .nft-overlay { background: #0c0f14; padding: calc(0.75rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom)); touch-action: pan-y; }
+html[data-shell="desk"] .nft-overlay { background: #0c0f14; }
 .nft-overlay[hidden] { display: none !important; }
 .nft-dialog { width: min(22rem, 100%); margin: auto; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
 .nft-sheet { width: 100%; overflow: hidden; }
@@ -213,7 +214,10 @@ html[data-shell="phone"] .nft-stage { width: 100%; }
 .nft-pill.held { background: transparent; color: #d5deea; border: 1px solid rgba(255, 255, 255, 0.35); }
 .nft-pill.held::before { background: #d5deea; }
 .nft-overlay-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; width: 100%; }
-.nft-overlay .nft-sell { flex-basis: 100%; width: 100%; }
+.nft-overlay .nft-sell, .nft-overlay .sale-actions { flex-basis: 100%; width: 100%; }
+.nft-overlay .sale-actions { align-items: center; }
+.nft-overlay .sale-actions a.sale-buy { width: 100%; }
+html[data-shell="desk"] .nft-overlay .sale-actions:has(canvas.qr) .sale-buy { display: block; }
 .nft-overlay .nft-sell input {
   background: rgba(255, 255, 255, 0.06);
   color: #f4f7fb;
@@ -249,6 +253,7 @@ button.nft-step { width: 2.25rem; height: 2.25rem; border-radius: 999px; font-si
 button.nft-step:disabled { opacity: 0.35; }
 html:has(.nft-overlay:not([hidden])) { overflow: hidden; }
 html[data-shell="phone"]:has(.nft-overlay:not([hidden])) .nft-grid { visibility: hidden; }
+html[data-shell="desk"]:has(.nft-overlay:not([hidden])) .nft-grid { visibility: hidden; }
 .tx-type { grid-area: type; font-weight: 650; font-size: 1rem; color: var(--text); }
 .tx-main {
   grid-area: main;
@@ -298,6 +303,7 @@ html[data-shell="phone"] #settings h2,
 html[data-shell="phone"] #transfer h2,
 html[data-shell="phone"] #send h2,
 html[data-shell="phone"] #receive h2,
+html[data-shell="phone"] #nfts h2,
 html[data-shell="phone"] #shop h2 { display: block; }
 html[data-shell="phone"] #receive.on { margin-top: 1.4rem; padding-top: 0.35rem; border-top: 1px solid var(--line); }
 .seg { display: flex; gap: 0.4rem; margin: 0 0 1rem; }
