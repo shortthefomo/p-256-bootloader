@@ -353,10 +353,11 @@ if (phone) {
   headActions.append(themeButton());
   head.append(headActions);
 }
-side.append.apply(side, [head, intro, $("a").parentElement, balanceLine, linesBox, $("g")].filter(Boolean));
+const statusLine = $("g");
+side.append.apply(side, [head, intro, $("a").parentElement, balanceLine, linesBox, statusLine].filter(Boolean));
 balanceLine.hidden = true;
 linesBox.hidden = true;
-$("g").hidden = true;
+if (statusLine) statusLine.hidden = true;
 if (intro) intro.hidden = true;
 stage.append.apply(stage, [$("d"), note, raw].filter(Boolean));
 frame.append(side, stage);
