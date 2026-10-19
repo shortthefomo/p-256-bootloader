@@ -481,6 +481,28 @@ export function safeReturn(url, account) {
   return `${parsed.origin}${parsed.pathname.replace(/\/$/, "")}`;
 }
 
+// A URI token buyer can return to the shop they were viewing. That page is a
+// different account from the one that signed, so safeReturn does not accept it.
+const PWA_ACCOUNT = /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/;
+
+export function pwaPage(url) {
+  let parsed;
+  try {
+    parsed = new URL(String(url || ""));
+  } catch {
+    return "";
+  }
+  if (parsed.protocol !== "https:") return "";
+  const hostOk = parsed.hostname === "pwa.passkey.xahau-dev.net"
+    || /^pwa\d+\.passkey\.xahau-dev\.net$/.test(parsed.hostname)
+    || /^pwa\d+\.pwa\.passkey\.xahau-dev\.net$/.test(parsed.hostname);
+  if (!hostOk) return "";
+  const path = parsed.pathname.replace(/\/$/, "");
+  const who = path.startsWith("/") ? path.slice(1) : path;
+  if (!PWA_ACCOUNT.test(who)) return "";
+  return `${parsed.origin}/${who}`;
+}
+
 export function pwaUrl(account) {
   return `${PWA_HOST}/${account}`;
 }

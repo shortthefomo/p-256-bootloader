@@ -299,5 +299,6 @@ export function sameTransaction(row, account, watch) {
   if (watch?.drops != null) return samePayment(row, watch);
   if (!watch?.type || row.type !== watch.type) return false;
   if (watch.destination && row.destination !== watch.destination) return false;
+  if (watch.token && String(row.tokenId || "").toUpperCase() !== String(watch.token).toUpperCase()) return false;
   return true;
 }

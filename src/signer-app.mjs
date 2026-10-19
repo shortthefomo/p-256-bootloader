@@ -45,6 +45,7 @@ import {
   networkDefinitions,
   paymentChallenge,
   prepareFields,
+  pwaPage,
   pwaUrl,
   requiredFee,
   rpcSocket,
@@ -204,6 +205,37 @@ function walletReturn(account, place) {
   if (place && String(place).indexOf("=") < 0) parts.push(params.get("logged") === "1" ? `view=${place}` : place);
   else if (place) parts.push(String(place).replace(/^#/, ""));
   return parts.length ? `${back}#${parts.join("&")}` : back;
+}
+
+function nftHome(account, back, tx) {
+  const type = String((tx && (tx.TransactionType || tx.type)) || "");
+  if (type.indexOf("URIToken") !== 0) return null;
+  const shop = pwaPage(back || "");
+  const own = isAddress(account) ? pwaUrl(account) : "";
+  const token = String((tx && (tx.URITokenID || tx.token)) || "").toUpperCase();
+  const gallery = type === "URITokenBurn" || (type === "URITokenBuy" && Boolean(shop) && shop !== own);
+  return { view: "nfts", token, gallery };
+}
+
+function nftLanding(account, back, home, hash) {
+  if (!home || home.view !== "nfts") return "";
+  const token = !home.gallery && /^[0-9A-F]{64}$/.test(String(home.token || "")) ? String(home.token).toUpperCase() : "";
+  const bits = [];
+  if (token) bits.push(`token=${token}`);
+  else bits.push("view=nfts");
+  if (hash) bits.push(`tx=${hash}`);
+  const marker = bits.join("&");
+  const shop = pwaPage(back || "");
+  const own = isAddress(account) ? pwaUrl(account) : "";
+  if (shop && shop !== own) return `${shop}#${marker}`;
+  return walletReturn(account, marker) || `${back || own}#${marker}`;
+}
+
+function uriBack(account, url, kind) {
+  const strict = account ? safeReturn(url || "", account) : null;
+  if (strict) return strict;
+  if (String(kind || "").indexOf("URIToken") === 0) return pwaPage(url || "") || null;
+  return null;
 }
 
 function walletReturnLink(account) {
@@ -522,8 +554,8 @@ async function loadAccount(account) {
   return { balance: BigInt(info.account_data.Balance), vault, credentialId: cid ? hexToBytes(cid) : null, spk };
 }
 
-function sent(account, back, hash, result) {
-  const next = walletReturn(account, `tx=${hash}`) || `${back || pwaUrl(account)}#tx=${hash}`;
+function sent(account, back, hash, result, home) {
+  const next = nftLanding(account, back, home, hash) || walletReturn(account, `tx=${hash}`) || `${back || pwaUrl(account)}#tx=${hash}`;
   const url = txUrl(hash);
   const where = url ? el("a", { href: url, target: "_blank", rel: "noopener" }, [shortAddress(hash)]) : shortAddress(hash);
   const backBtn = el("button", { onclick: () => location.assign(next) }, ["Back to wallet"]);
@@ -543,13 +575,15 @@ function txJson(prepared, pubkey) {
   return JSON.stringify(view, null, 2);
 }
 
-function rejected(account, back, error, retry) {
+function rejected(account, back, error, retry, home) {
+  const nft = nftLanding(account, back, home, "");
   screen("Transaction was not sent", [
     el("p", {}, [error.message || String(error)]),
     el("button", {
       class: "ghost",
       onclick: () => {
         if (retry) retry();
+        else if (nft) location.assign(nft);
         else if (back) location.assign(params.get("logged") === "1" ? (walletReturn(account) || back) : back);
         else composer({ account, back });
       },
@@ -612,7 +646,7 @@ async function approve({ account, back, make, needsPublicKey, next, note, retry,
       }
       return;
     }
-    sent(account, back, tx.hash, tx.validated);
+    sent(account, back, tx.hash, tx.validated, nftHome(account, back, made.tx));
   }
 
   go.addEventListener("click", async () => {
@@ -631,7 +665,7 @@ async function approve({ account, back, make, needsPublicKey, next, note, retry,
       await finish();
     } catch (error) {
       const detail = error.message || String(error);
-      rejected(account, back, new Error(note && !detail.includes(note) ? `${note} ${detail}` : detail), retry);
+      rejected(account, back, new Error(note && !detail.includes(note) ? `${note} ${detail}` : detail), retry, nftHome(account, back, made.tx));
     }
   });
 }
@@ -2093,7 +2127,8 @@ function handoff({ account, back, summary, url, watch, signHere }) {
       class: "link",
       type: "button",
       onclick: () => {
-        const next = params.get("logged") === "1" ? (walletReturn(account) || back) : back;
+        const next = nftLanding(account, back, nftHome(account, back, watch), "")
+          || (params.get("logged") === "1" ? (walletReturn(account) || back) : back);
         if (next) location.assign(next);
         else walletHome(account);
       },
@@ -2120,7 +2155,7 @@ async function watchPayment({ account, back, gen, status, watch }) {
     try {
       const hit = (await recent(account, 8)).find((row) => row.hash && !seen.has(row.hash) && sameTransaction(row, account, watch));
       if (hit) {
-        sent(account, back, hit.hash, { hash: hit.hash, result: "tesSUCCESS" });
+        sent(account, back, hit.hash, { hash: hit.hash, result: "tesSUCCESS" }, nftHome(account, back, watch));
         return;
       }
     } catch {
@@ -2132,7 +2167,7 @@ async function watchPayment({ account, back, gen, status, watch }) {
 async function openBuilt({ account, kind, values, back }) {
   if (!isAddress(account)) {
     askAccount((chosen) => {
-      openBuilt({ account: chosen, kind, values, back: safeReturn(back || "", chosen) }).catch((error) => rejected(chosen, null, error));
+      openBuilt({ account: chosen, kind, values, back: uriBack(chosen, back || "", kind) }).catch((error) => rejected(chosen, null, error));
     });
     return;
   }
@@ -2155,7 +2190,7 @@ async function openBuilt({ account, kind, values, back }) {
     url: requestLink({ page: location.href, account, kind, values, returnTo: back || "" }),
     watch: preview.payment
       ? { dest: preview.payment.destination, drops: preview.payment.drops }
-      : { type: preview.tx.TransactionType, destination: preview.tx.Destination || "" },
+      : { type: preview.tx.TransactionType, destination: preview.tx.Destination || "", token: preview.tx.URITokenID || "" },
     signHere,
   });
 }
@@ -2194,7 +2229,7 @@ function openScanned(text) {
       account,
       kind: found.kind,
       values: found.values,
-      back: account ? safeReturn(found.returnTo, account) : null,
+      back: uriBack(account || "", found.returnTo, found.kind),
     }).catch((error) => fail(error));
     return;
   }
@@ -2669,7 +2704,7 @@ async function main() {
         account,
         kind: found.kind,
         values: found.values,
-        back: account ? safeReturn(found.returnTo, account) : null,
+        back: uriBack(account || "", found.returnTo, found.kind),
       });
       return;
     }

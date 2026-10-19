@@ -218,12 +218,16 @@ html[data-shell="phone"] .nft-stage { width: 100%; }
 .nft-overlay .sale-actions { align-items: center; }
 .nft-overlay .sale-actions a.sale-buy { width: 100%; }
 html[data-shell="desk"] .nft-overlay .sale-actions:has(canvas.qr) .sale-buy { display: block; }
-.nft-overlay .nft-sell input {
+.nft-overlay .nft-sell input,
+.nft-overlay .sale-actions input {
   background: rgba(255, 255, 255, 0.06);
   color: #f4f7fb;
   border-color: rgba(255, 255, 255, 0.28);
 }
-.nft-overlay .nft-sell input::placeholder { color: #93a0b5; }
+.nft-overlay .nft-sell input::placeholder,
+.nft-overlay .sale-actions input::placeholder { color: #93a0b5; }
+.nft-overlay .sale-actions a.sale-bid { width: 100%; }
+.nft-overlay .sale-actions .bid-note { width: 100%; margin: 0; color: #ffd38a; text-align: center; }
 .nft-overlay-actions button, .nft-overlay-actions a.b { width: auto; margin: 0; padding: 0.7rem 1rem; }
 .nft-overlay .nft-sell a.b { width: 100%; margin: 0.35rem 0 0; }
 .nft-overlay-actions a.b.g { color: #f4f7fb; border-color: rgba(255, 255, 255, 0.35); }
