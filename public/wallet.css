@@ -310,8 +310,9 @@ html[data-shell="desk"] nav.menu a.tab.on { background: var(--accent); color: va
 html[data-shell="desk"] #layout[data-view="home"] #shop,
 html[data-shell="desk"] #layout[data-view="home"] #settings { display: none; }
 html[data-shell="desk"] #layout:not([data-view="home"]) .panel { display: none; }
-html[data-shell="desk"] #layout[data-view="send"] #send,
-html[data-shell="desk"] #layout[data-view="receive"] #receive,
+html[data-shell="desk"] #layout[data-view="transfer"] #transfer,
+html[data-shell="desk"] #layout[data-view="send"] #transfer,
+html[data-shell="desk"] #layout[data-view="receive"] #transfer,
 html[data-shell="desk"] #layout[data-view="nfts"] #nfts,
 html[data-shell="desk"] #layout[data-view="shop"] #shop,
 html[data-shell="desk"] #layout[data-view="activity"] #activity,
@@ -400,7 +401,11 @@ html[data-shell="desk"] .panel {
   padding: 1rem 1.05rem 1.1rem;
 }
 html[data-shell="desk"] #activity,
-html[data-shell="desk"] #nfts { grid-column: 1 / -1; min-width: 0; }
+html[data-shell="desk"] #nfts,
+html[data-shell="desk"] #transfer { grid-column: 1 / -1; min-width: 0; }
+html[data-shell="desk"] #transfer { max-width: 32rem; padding: 0; overflow: hidden; }
+html[data-shell="desk"] #layout #transfer > .panel { display: block; margin: 0; background: transparent; border: 0; border-radius: 0; }
+html[data-shell="desk"] #layout #transfer > #receive { border-top: 1px solid var(--line); }
 html[data-shell="desk"] #nfts .nft { background: var(--surface-2); }
 html[data-shell="desk"] #nfts .nft-art { background: var(--bg); }
 html[data-shell="desk"] #send input,

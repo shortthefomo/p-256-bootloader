@@ -2228,6 +2228,27 @@ function openScanned(text) {
     ]),
     again ? el("button", { class: "ghost", type: "button", onclick: () => scan(again) }, ["Scan again"]) : el("button", { class: "ghost", type: "button", onclick: () => home() }, ["Back"]),
   ], again ? "scan" : "");
+  if (again) phoneScanNav(again);
+}
+
+function phoneScanNav(account) {
+  if (shell() !== "phone" || !isAddress(account)) return;
+  const items = [
+    ["transfer", "transfer"],
+    ["scan", ""],
+    ["nfts", "nfts"],
+    ["shop", "shop"],
+    ["activity", "activity"],
+    ["settings", "settings"],
+  ];
+  nav.replaceChildren(...items.map(([id, place]) => {
+    const label = text(id);
+    if (!place) return el("button", { class: "tab on", type: "button", title: label }, [label]);
+    const href = walletReturn(account, place);
+    if (!href) return el("button", { class: "tab", type: "button", title: label }, [label]);
+    return el("a", { class: "tab", href, title: label }, [label]);
+  }));
+  nav.hidden = false;
 }
 
 function scan(account) {
@@ -2245,6 +2266,7 @@ function scan(account) {
   screen(text("scan"), shell() === "desk"
     ? [back, el("div", { class: "split scan-split" }, [finder, el("div", {}, [note, paste])])]
     : [back, finder, note, paste]);
+  phoneScanNav(account);
   const gen = viewGen;
   open.addEventListener("click", () => {
     if (pasted.value.trim()) take(pasted.value.trim());

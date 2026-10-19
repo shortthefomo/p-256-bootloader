@@ -578,8 +578,8 @@ function viewFromHash() {
   if (raw.indexOf("=") >= 0) {
     try { named = new URLSearchParams(raw).get("view") || ""; } catch (error) { named = ""; }
   }
-  if (named === "transfer") return "send";
-  if (["home", "send", "receive", "nfts", "shop", "activity", "settings"].indexOf(named) >= 0) return named;
+  if (named === "transfer" || named === "send" || named === "receive") return "transfer";
+  if (["home", "nfts", "shop", "activity", "settings"].indexOf(named) >= 0) return named;
   return "home";
 }
 
@@ -631,7 +631,7 @@ function buildDeskNav(owner, passkey) {
   menu.className = "menu";
   var items = [];
   if (owner) {
-    items.push(deskItem("home"), deskItem("send"), deskItem("receive"), deskItem("nfts"), deskItem("shop"), deskItem("activity"), deskItem("scan", href("scan")), deskItem("settings"), logoutControl("tab"));
+    items.push(deskItem("home"), deskItem("transfer"), deskItem("nfts"), deskItem("shop"), deskItem("activity"), deskItem("scan", href("scan")), deskItem("settings"), logoutControl("tab"));
   } else {
     items.push(deskItem("shop"));
     if (passkey) items.push(deskItem("login", href("login")));
@@ -1669,7 +1669,7 @@ function show(which) {
   const panels = document.querySelectorAll(".panel");
   for (let i = 0; i < panels.length; i++) {
     const id = panels[i].id;
-    const on = which === "transfer" ? id === "send" || id === "receive" : id === which;
+    const on = which === "transfer" ? id === "transfer" || id === "send" || id === "receive" : id === which;
     panels[i].classList.toggle("on", on);
   }
   const tabs = document.querySelectorAll("nav.tabs button, nav.tabs a");
@@ -1991,7 +1991,11 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
 
   const layout = document.createElement("div");
   layout.id = "layout";
-  if (walletOwner) layout.append(sendPanel, receivePanel, activityPanel, nftPanel);
+  if (walletOwner) {
+    var transferPanel = panel("transfer");
+    transferPanel.append(sendPanel, receivePanel);
+    layout.append(transferPanel, activityPanel, nftPanel);
+  }
   layout.append(shopPanel);
   if (walletOwner) layout.append(settingsPanel);
   if (phone) {
