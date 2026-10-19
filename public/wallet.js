@@ -120,14 +120,14 @@ var FORMATS = [
   { id: "space-dot", group: " ", decimal: ".", example: "1 234.5" },
 ];
 var CATALOG = {
-  en: { send: "Send", receive: "Receive", transfer: "Transfer", scan: "Scan", activity: "Activity", settings: "Settings", version: "Version", general: "General", language: "Language", currencyFormat: "Currency format", formatHint: "Balances and amounts you type use this format. A QR code stores a plain amount.", firewall: "Passkey firewall", walletInterface: "Wallet interface", installed: "Installed", shipped: "This wallet", current: "Current", updateAvailable: "Update available", notInstalled: "Not installed", notPublished: "Not published", updateFirewall: "Update firewall", updateWallet: "Install update", executionFee: "Execution fee", hookMatches: "This account runs the firewall shipped with this wallet.", hookDiffers: "This account runs a different firewall than the one shipped with this wallet.", hookMissing: "No firewall is installed on this account.", hookUnreadable: "The network did not return the firewall version.", interfaceMatches: "The published wallet page matches this wallet.", interfaceDiffers: "A new wallet page is ready for this account.", interfaceMissing: "This account has no wallet page yet.", layout: "Layout", mobile: "Mobile", desktop: "Desktop", light: "Light", dark: "Dark", loading: "Loading…", drops: "drops", amountInvalid: "Enter an amount", nfts: "NFTs", shop: "Shop", nftEmpty: "No URI tokens on this account.", nftMint: "Mint a URI token", nftBurn: "Burn", nftSell: "Sell", nftMakeOffer: "Make offer", nftCancelSale: "Cancel sale", nftForSale: "For sale", nftEdition: "Edition", nftUnavailable: "URI tokens are unavailable.", nftAccept: "Accept", nftDecline: "Decline", nftOffer: "Offer", nftClose: "Close", nftCount: "{n} of {m}", nftAll: "All", nftOffers: "Offers", nftNotForSale: "Not for sale", nftNoMatch: "Nothing matches.", nftCopy: "Copy", nftCopied: "Copied", nftShare: "Share", nftShareShop: "Share for sale", nftTweet: "For sale on Xahau", nftShop: "All for sale" },
-  es: { send: "Enviar", receive: "Recibir", transfer: "Mover", scan: "Escanear", activity: "Actividad", settings: "Ajustes", version: "Versión", general: "General", language: "Idioma", currencyFormat: "Formato de cantidad", formatHint: "Los saldos y las cantidades que escribes usan este formato. Un código QR guarda una cantidad simple.", firewall: "Cortafuegos passkey", walletInterface: "Interfaz del monedero", installed: "Instalado", shipped: "Este monedero", current: "Al día", updateAvailable: "Hay una actualización", notInstalled: "No instalado", notPublished: "Sin publicar", updateFirewall: "Actualizar el cortafuegos", updateWallet: "Instalar actualización", executionFee: "Comisión de ejecución", hookMatches: "Esta cuenta usa el cortafuegos que trae este monedero.", hookDiffers: "Esta cuenta usa un cortafuegos distinto del que trae este monedero.", hookMissing: "Esta cuenta no tiene el cortafuegos instalado.", hookUnreadable: "La red no devolvió la versión del cortafuegos.", interfaceMatches: "La página publicada coincide con este monedero.", interfaceDiffers: "Hay una página nueva lista para esta cuenta.", interfaceMissing: "Esta cuenta todavía no tiene página.", layout: "Diseño", mobile: "Móvil", desktop: "Escritorio", light: "Claro", dark: "Oscuro", loading: "Cargando…", drops: "drops", amountInvalid: "Escribe una cantidad", nfts: "NFTs", shop: "Tienda", nftEmpty: "No hay URI tokens en esta cuenta.", nftMint: "Acuñar un URI token", nftBurn: "Quemar", nftSell: "Vender", nftMakeOffer: "Hacer una oferta", nftCancelSale: "Cancelar la venta", nftForSale: "En venta", nftEdition: "Edición", nftUnavailable: "Los URI tokens no están disponibles.", nftAccept: "Aceptar", nftDecline: "Rechazar", nftOffer: "Oferta", nftClose: "Cerrar", nftCount: "{n} de {m}", nftAll: "Todos", nftOffers: "Ofertas", nftNotForSale: "Sin venta", nftNoMatch: "Nada coincide.", nftCopy: "Copiar", nftCopied: "Copiado", nftShare: "Compartir", nftShareShop: "Compartir en venta", nftTweet: "En venta en Xahau", nftShop: "Todo en venta" },
-  fr: { send: "Envoyer", receive: "Recevoir", transfer: "Transfert", scan: "Scanner", activity: "Activité", settings: "Réglages", version: "Version", general: "Général", language: "Langue", currencyFormat: "Format du montant", formatHint: "Les soldes et les montants saisis utilisent ce format. Un QR code garde un montant simple.", firewall: "Pare-feu passkey", walletInterface: "Interface du portefeuille", installed: "Installé", shipped: "Ce portefeuille", current: "À jour", updateAvailable: "Mise à jour disponible", notInstalled: "Non installé", notPublished: "Non publié", updateFirewall: "Mettre à jour le pare-feu", updateWallet: "Installer la mise à jour", executionFee: "Frais d’exécution", hookMatches: "Ce compte utilise le pare-feu livré avec ce portefeuille.", hookDiffers: "Ce compte utilise un pare-feu différent de celui livré avec ce portefeuille.", hookMissing: "Aucun pare-feu n’est installé sur ce compte.", hookUnreadable: "Le réseau n’a pas renvoyé la version du pare-feu.", interfaceMatches: "La page publiée correspond à ce portefeuille.", interfaceDiffers: "Une nouvelle page est prête pour ce compte.", interfaceMissing: "Ce compte n’a pas encore de page.", layout: "Disposition", mobile: "Mobile", desktop: "Ordinateur", light: "Clair", dark: "Sombre", loading: "Chargement…", drops: "drops", amountInvalid: "Saisissez un montant", nfts: "NFTs", shop: "Boutique", nftEmpty: "Aucun URI token sur ce compte.", nftMint: "Émettre un URI token", nftBurn: "Détruire", nftSell: "Vendre", nftMakeOffer: "Faire une offre", nftCancelSale: "Annuler la vente", nftForSale: "En vente", nftEdition: "Édition", nftUnavailable: "Les URI tokens ne sont pas disponibles.", nftAccept: "Accepter", nftDecline: "Refuser", nftOffer: "Offre", nftClose: "Fermer", nftCount: "{n} sur {m}", nftAll: "Tous", nftOffers: "Offres", nftNotForSale: "Pas en vente", nftNoMatch: "Aucun résultat.", nftCopy: "Copier", nftCopied: "Copié", nftShare: "Partager", nftShareShop: "Partager en vente", nftTweet: "En vente sur Xahau", nftShop: "Tout en vente" },
-  de: { send: "Senden", receive: "Empfangen", transfer: "Transfer", scan: "Scannen", activity: "Aktivität", settings: "Einstellungen", version: "Version", general: "Allgemein", language: "Sprache", currencyFormat: "Zahlenformat", formatHint: "Guthaben und eingegebene Beträge nutzen dieses Format. Ein QR-Code speichert einen einfachen Betrag.", firewall: "Passkey-Firewall", walletInterface: "Wallet-Oberfläche", installed: "Installiert", shipped: "Diese Wallet", current: "Aktuell", updateAvailable: "Update verfügbar", notInstalled: "Nicht installiert", notPublished: "Nicht veröffentlicht", updateFirewall: "Firewall aktualisieren", updateWallet: "Update installieren", executionFee: "Ausführungsgebühr", hookMatches: "Dieses Konto nutzt die Firewall aus dieser Wallet.", hookDiffers: "Dieses Konto nutzt eine andere Firewall als die aus dieser Wallet.", hookMissing: "Auf diesem Konto ist keine Firewall installiert.", hookUnreadable: "Das Netzwerk hat die Firewall-Version nicht geliefert.", interfaceMatches: "Die veröffentlichte Seite entspricht dieser Wallet.", interfaceDiffers: "Eine neue Seite ist für dieses Konto bereit.", interfaceMissing: "Dieses Konto hat noch keine Seite.", layout: "Layout", mobile: "Mobil", desktop: "Desktop", light: "Hell", dark: "Dunkel", loading: "Wird geladen…", drops: "drops", amountInvalid: "Gib einen Betrag ein", nfts: "NFTs", shop: "Shop", nftEmpty: "Keine URI-Tokens auf diesem Konto.", nftMint: "URI-Token prägen", nftBurn: "Vernichten", nftSell: "Verkaufen", nftMakeOffer: "Angebot machen", nftCancelSale: "Verkauf abbrechen", nftForSale: "Zu verkaufen", nftEdition: "Ausgabe", nftUnavailable: "URI-Tokens sind nicht verfügbar.", nftAccept: "Annehmen", nftDecline: "Ablehnen", nftOffer: "Angebot", nftClose: "Schließen", nftCount: "{n} von {m}", nftAll: "Alle", nftOffers: "Angebote", nftNotForSale: "Nicht im Verkauf", nftNoMatch: "Nichts passt.", nftCopy: "Kopieren", nftCopied: "Kopiert", nftShare: "Teilen", nftShareShop: "Verkauf teilen", nftTweet: "Zu verkaufen auf Xahau", nftShop: "Alles im Verkauf" },
-  pt: { send: "Enviar", receive: "Receber", transfer: "Mover", scan: "Ler", activity: "Atividade", settings: "Ajustes", version: "Versão", general: "Geral", language: "Idioma", currencyFormat: "Formato do valor", formatHint: "Saldos e valores digitados usam este formato. Um QR guarda um valor simples.", firewall: "Firewall passkey", walletInterface: "Interface da carteira", installed: "Instalado", shipped: "Esta carteira", current: "Em dia", updateAvailable: "Atualização disponível", notInstalled: "Não instalado", notPublished: "Não publicada", updateFirewall: "Atualizar o firewall", updateWallet: "Instalar atualização", executionFee: "Taxa de execução", hookMatches: "Esta conta usa o firewall que vem com esta carteira.", hookDiffers: "Esta conta usa um firewall diferente do que vem com esta carteira.", hookMissing: "Não há firewall instalado nesta conta.", hookUnreadable: "A rede não devolveu a versão do firewall.", interfaceMatches: "A página publicada corresponde a esta carteira.", interfaceDiffers: "Uma página nova está pronta para esta conta.", interfaceMissing: "Esta conta ainda não tem página.", layout: "Layout", mobile: "Celular", desktop: "Computador", light: "Claro", dark: "Escuro", loading: "Carregando…", drops: "drops", amountInvalid: "Digite um valor", nfts: "NFTs", shop: "Loja", nftEmpty: "Não há URI tokens nesta conta.", nftMint: "Emitir um URI token", nftBurn: "Queimar", nftSell: "Vender", nftMakeOffer: "Fazer uma oferta", nftCancelSale: "Cancelar a venda", nftForSale: "À venda", nftEdition: "Edição", nftUnavailable: "Os URI tokens não estão disponíveis.", nftAccept: "Aceitar", nftDecline: "Recusar", nftOffer: "Oferta", nftClose: "Fechar", nftCount: "{n} de {m}", nftAll: "Todos", nftOffers: "Ofertas", nftNotForSale: "Sem venda", nftNoMatch: "Nada encontrado.", nftCopy: "Copiar", nftCopied: "Copiado", nftShare: "Compartilhar", nftShareShop: "Compartilhar à venda", nftTweet: "À venda na Xahau", nftShop: "Tudo à venda" },
-  zh: { send: "发送", receive: "收款", transfer: "收发", scan: "扫描", activity: "活动", settings: "设置", version: "版本", general: "通用", language: "语言", currencyFormat: "金额格式", formatHint: "余额和输入的金额使用此格式。二维码保存的是普通金额。", firewall: "Passkey 防火墙", walletInterface: "钱包界面", installed: "已安装", shipped: "此钱包", current: "已是最新", updateAvailable: "有可用更新", notInstalled: "未安装", notPublished: "未发布", updateFirewall: "更新防火墙", updateWallet: "安装更新", executionFee: "执行费用", hookMatches: "此账户运行的是本钱包附带的防火墙。", hookDiffers: "此账户运行的防火墙与本钱包附带的不同。", hookMissing: "此账户尚未安装防火墙。", hookUnreadable: "网络没有返回防火墙版本。", interfaceMatches: "已发布的页面与此钱包一致。", interfaceDiffers: "此账户有新的钱包页面可以安装。", interfaceMissing: "此账户还没有钱包页面。", layout: "布局", mobile: "手机", desktop: "电脑", light: "浅色", dark: "深色", loading: "正在加载…", drops: "drops", amountInvalid: "请输入金额", nfts: "NFTs", shop: "商店", nftEmpty: "此账户没有 URI 代币。", nftMint: "铸造 URI 代币", nftBurn: "销毁", nftSell: "出售", nftMakeOffer: "出价", nftCancelSale: "取消出售", nftForSale: "在售", nftEdition: "版次", nftUnavailable: "无法读取 URI 代币。", nftAccept: "接受", nftDecline: "拒绝", nftOffer: "报价", nftClose: "关闭", nftCount: "{n} / {m}", nftAll: "全部", nftOffers: "报价", nftNotForSale: "未出售", nftNoMatch: "没有匹配。", nftCopy: "复制", nftCopied: "已复制", nftShare: "分享", nftShareShop: "分享在售", nftTweet: "在 Xahau 出售", nftShop: "全部在售" },
-  ja: { send: "送金", receive: "受取", transfer: "入出金", scan: "スキャン", activity: "履歴", settings: "設定", version: "バージョン", general: "一般", language: "言語", currencyFormat: "金額の形式", formatHint: "残高と入力する金額はこの形式です。QRコードには単純な金額が入ります。", firewall: "パスキーファイアウォール", walletInterface: "ウォレット画面", installed: "導入済み", shipped: "このウォレット", current: "最新", updateAvailable: "更新があります", notInstalled: "未導入", notPublished: "未公開", updateFirewall: "ファイアウォールを更新", updateWallet: "更新をインストール", executionFee: "実行手数料", hookMatches: "このアカウントは、このウォレットに同梱されたファイアウォールです。", hookDiffers: "このアカウントのファイアウォールは、このウォレットに同梱されたものと違います。", hookMissing: "このアカウントにはファイアウォールがありません。", hookUnreadable: "ネットワークがファイアウォールのバージョンを返しませんでした。", interfaceMatches: "公開中のページは、このウォレットと一致しています。", interfaceDiffers: "このアカウントに新しいページを入れられます。", interfaceMissing: "このアカウントにはまだページがありません。", layout: "レイアウト", mobile: "モバイル", desktop: "デスクトップ", light: "ライト", dark: "ダーク", loading: "読み込み中…", drops: "drops", amountInvalid: "金額を入力してください", nfts: "NFTs", shop: "ショップ", nftEmpty: "このアカウントに URI トークンはありません。", nftMint: "URI トークンを発行", nftBurn: "破棄", nftSell: "売却", nftMakeOffer: "オファーを出す", nftCancelSale: "売却を取り消す", nftForSale: "売却中", nftEdition: "エディション", nftUnavailable: "URI トークンを取得できません。", nftAccept: "受け取る", nftDecline: "辞退", nftOffer: "オファー", nftClose: "閉じる", nftCount: "{n} / {m}", nftAll: "すべて", nftOffers: "オファー", nftNotForSale: "未出品", nftNoMatch: "該当なし", nftCopy: "コピー", nftCopied: "コピーしました", nftShare: "共有", nftShareShop: "出品を共有", nftTweet: "Xahau で売却中", nftShop: "出品一覧" },
-  ko: { send: "보내기", receive: "받기", transfer: "이체", scan: "스캔", activity: "활동", settings: "설정", version: "버전", general: "일반", language: "언어", currencyFormat: "금액 형식", formatHint: "잔액과 입력하는 금액이 이 형식을 사용합니다. QR 코드에는 일반 금액이 저장됩니다.", firewall: "패스키 방화벽", walletInterface: "지갑 화면", installed: "설치됨", shipped: "이 지갑", current: "최신", updateAvailable: "업데이트 있음", notInstalled: "설치되지 않음", notPublished: "게시되지 않음", updateFirewall: "방화벽 업데이트", updateWallet: "업데이트 설치", executionFee: "실행 수수료", hookMatches: "이 계정은 이 지갑에 포함된 방화벽을 사용합니다.", hookDiffers: "이 계정의 방화벽은 이 지갑에 포함된 것과 다릅니다.", hookMissing: "이 계정에는 방화벽이 설치되어 있지 않습니다.", hookUnreadable: "네트워크가 방화벽 버전을 반환하지 않았습니다.", interfaceMatches: "게시된 페이지가 이 지갑과 일치합니다.", interfaceDiffers: "이 계정에 새 지갑 페이지를 설치할 수 있습니다.", interfaceMissing: "이 계정에는 아직 지갑 페이지가 없습니다.", layout: "레이아웃", mobile: "모바일", desktop: "데스크톱", light: "라이트", dark: "다크", loading: "불러오는 중…", drops: "drops", amountInvalid: "금액을 입력하세요", nfts: "NFTs", shop: "상점", nftEmpty: "이 계정에는 URI 토큰이 없습니다.", nftMint: "URI 토큰 발행", nftBurn: "소각", nftSell: "판매", nftMakeOffer: "제안하기", nftCancelSale: "판매 취소", nftForSale: "판매 중", nftEdition: "에디션", nftUnavailable: "URI 토큰을 불러올 수 없습니다.", nftAccept: "수락", nftDecline: "거절", nftOffer: "제안", nftClose: "닫기", nftCount: "{n} / {m}", nftAll: "전체", nftOffers: "제안", nftNotForSale: "미판매", nftNoMatch: "일치하는 항목 없음", nftCopy: "복사", nftCopied: "복사함", nftShare: "공유", nftShareShop: "판매 공유", nftTweet: "Xahau에서 판매 중", nftShop: "판매 전체" },
+  en: { home: "Home", send: "Send", receive: "Receive", transfer: "Transfer", scan: "Scan", activity: "Activity", settings: "Settings", version: "Version", general: "General", language: "Language", currencyFormat: "Currency format", formatHint: "Balances and amounts you type use this format. A QR code stores a plain amount.", firewall: "Passkey firewall", walletInterface: "Wallet interface", installed: "Installed", shipped: "This wallet", current: "Current", updateAvailable: "Update available", notInstalled: "Not installed", notPublished: "Not published", updateFirewall: "Update firewall", updateWallet: "Install update", executionFee: "Execution fee", hookMatches: "This account runs the firewall shipped with this wallet.", hookDiffers: "This account runs a different firewall than the one shipped with this wallet.", hookMissing: "No firewall is installed on this account.", hookUnreadable: "The network did not return the firewall version.", interfaceMatches: "The published wallet page matches this wallet.", interfaceDiffers: "A new wallet page is ready for this account.", interfaceMissing: "This account has no wallet page yet.", layout: "Layout", mobile: "Mobile", desktop: "Desktop", light: "Light", dark: "Dark", loading: "Loading…", drops: "drops", amountInvalid: "Enter an amount", nfts: "NFTs", shop: "Shop", nftEmpty: "No URI tokens on this account.", nftMint: "Mint a URI token", nftBurn: "Burn", nftSell: "Sell", nftMakeOffer: "Make offer", nftCancelSale: "Cancel sale", nftForSale: "For sale", nftEdition: "Edition", nftUnavailable: "URI tokens are unavailable.", nftAccept: "Accept", nftDecline: "Decline", nftOffer: "Offer", nftClose: "Close", nftCount: "{n} of {m}", nftAll: "All", nftOffers: "Offers", nftNotForSale: "Not for sale", nftNoMatch: "Nothing matches.", nftCopy: "Copy", nftCopied: "Copied", nftShare: "Share", nftShareShop: "Share for sale", nftTweet: "For sale on Xahau", nftShop: "All for sale", nftShopEmpty: "Nothing is listed for sale.", nftOfferScan: "Scan this code to make an offer.", nftPurchase: "Buy", nftMissing: "That token is not on this account." },
+  es: { home: "Inicio", send: "Enviar", receive: "Recibir", transfer: "Mover", scan: "Escanear", activity: "Actividad", settings: "Ajustes", version: "Versión", general: "General", language: "Idioma", currencyFormat: "Formato de cantidad", formatHint: "Los saldos y las cantidades que escribes usan este formato. Un código QR guarda una cantidad simple.", firewall: "Cortafuegos passkey", walletInterface: "Interfaz del monedero", installed: "Instalado", shipped: "Este monedero", current: "Al día", updateAvailable: "Hay una actualización", notInstalled: "No instalado", notPublished: "Sin publicar", updateFirewall: "Actualizar el cortafuegos", updateWallet: "Instalar actualización", executionFee: "Comisión de ejecución", hookMatches: "Esta cuenta usa el cortafuegos que trae este monedero.", hookDiffers: "Esta cuenta usa un cortafuegos distinto del que trae este monedero.", hookMissing: "Esta cuenta no tiene el cortafuegos instalado.", hookUnreadable: "La red no devolvió la versión del cortafuegos.", interfaceMatches: "La página publicada coincide con este monedero.", interfaceDiffers: "Hay una página nueva lista para esta cuenta.", interfaceMissing: "Esta cuenta todavía no tiene página.", layout: "Diseño", mobile: "Móvil", desktop: "Escritorio", light: "Claro", dark: "Oscuro", loading: "Cargando…", drops: "drops", amountInvalid: "Escribe una cantidad", nfts: "NFTs", shop: "Tienda", nftEmpty: "No hay URI tokens en esta cuenta.", nftMint: "Acuñar un URI token", nftBurn: "Quemar", nftSell: "Vender", nftMakeOffer: "Hacer una oferta", nftCancelSale: "Cancelar la venta", nftForSale: "En venta", nftEdition: "Edición", nftUnavailable: "Los URI tokens no están disponibles.", nftAccept: "Aceptar", nftDecline: "Rechazar", nftOffer: "Oferta", nftClose: "Cerrar", nftCount: "{n} de {m}", nftAll: "Todos", nftOffers: "Ofertas", nftNotForSale: "Sin venta", nftNoMatch: "Nada coincide.", nftCopy: "Copiar", nftCopied: "Copiado", nftShare: "Compartir", nftShareShop: "Compartir en venta", nftTweet: "En venta en Xahau", nftShop: "Todo en venta", nftShopEmpty: "Nada está en venta.", nftOfferScan: "Escanea este código para hacer una oferta.", nftPurchase: "Comprar", nftMissing: "Ese token no está en esta cuenta." },
+  fr: { home: "Accueil", send: "Envoyer", receive: "Recevoir", transfer: "Transfert", scan: "Scanner", activity: "Activité", settings: "Réglages", version: "Version", general: "Général", language: "Langue", currencyFormat: "Format du montant", formatHint: "Les soldes et les montants saisis utilisent ce format. Un QR code garde un montant simple.", firewall: "Pare-feu passkey", walletInterface: "Interface du portefeuille", installed: "Installé", shipped: "Ce portefeuille", current: "À jour", updateAvailable: "Mise à jour disponible", notInstalled: "Non installé", notPublished: "Non publié", updateFirewall: "Mettre à jour le pare-feu", updateWallet: "Installer la mise à jour", executionFee: "Frais d’exécution", hookMatches: "Ce compte utilise le pare-feu livré avec ce portefeuille.", hookDiffers: "Ce compte utilise un pare-feu différent de celui livré avec ce portefeuille.", hookMissing: "Aucun pare-feu n’est installé sur ce compte.", hookUnreadable: "Le réseau n’a pas renvoyé la version du pare-feu.", interfaceMatches: "La page publiée correspond à ce portefeuille.", interfaceDiffers: "Une nouvelle page est prête pour ce compte.", interfaceMissing: "Ce compte n’a pas encore de page.", layout: "Disposition", mobile: "Mobile", desktop: "Ordinateur", light: "Clair", dark: "Sombre", loading: "Chargement…", drops: "drops", amountInvalid: "Saisissez un montant", nfts: "NFTs", shop: "Boutique", nftEmpty: "Aucun URI token sur ce compte.", nftMint: "Émettre un URI token", nftBurn: "Détruire", nftSell: "Vendre", nftMakeOffer: "Faire une offre", nftCancelSale: "Annuler la vente", nftForSale: "En vente", nftEdition: "Édition", nftUnavailable: "Les URI tokens ne sont pas disponibles.", nftAccept: "Accepter", nftDecline: "Refuser", nftOffer: "Offre", nftClose: "Fermer", nftCount: "{n} sur {m}", nftAll: "Tous", nftOffers: "Offres", nftNotForSale: "Pas en vente", nftNoMatch: "Aucun résultat.", nftCopy: "Copier", nftCopied: "Copié", nftShare: "Partager", nftShareShop: "Partager en vente", nftTweet: "En vente sur Xahau", nftShop: "Tout en vente", nftShopEmpty: "Rien n’est en vente.", nftOfferScan: "Scannez ce code pour faire une offre.", nftPurchase: "Acheter", nftMissing: "Ce token n’est pas sur ce compte." },
+  de: { home: "Start", send: "Senden", receive: "Empfangen", transfer: "Transfer", scan: "Scannen", activity: "Aktivität", settings: "Einstellungen", version: "Version", general: "Allgemein", language: "Sprache", currencyFormat: "Zahlenformat", formatHint: "Guthaben und eingegebene Beträge nutzen dieses Format. Ein QR-Code speichert einen einfachen Betrag.", firewall: "Passkey-Firewall", walletInterface: "Wallet-Oberfläche", installed: "Installiert", shipped: "Diese Wallet", current: "Aktuell", updateAvailable: "Update verfügbar", notInstalled: "Nicht installiert", notPublished: "Nicht veröffentlicht", updateFirewall: "Firewall aktualisieren", updateWallet: "Update installieren", executionFee: "Ausführungsgebühr", hookMatches: "Dieses Konto nutzt die Firewall aus dieser Wallet.", hookDiffers: "Dieses Konto nutzt eine andere Firewall als die aus dieser Wallet.", hookMissing: "Auf diesem Konto ist keine Firewall installiert.", hookUnreadable: "Das Netzwerk hat die Firewall-Version nicht geliefert.", interfaceMatches: "Die veröffentlichte Seite entspricht dieser Wallet.", interfaceDiffers: "Eine neue Seite ist für dieses Konto bereit.", interfaceMissing: "Dieses Konto hat noch keine Seite.", layout: "Layout", mobile: "Mobil", desktop: "Desktop", light: "Hell", dark: "Dunkel", loading: "Wird geladen…", drops: "drops", amountInvalid: "Gib einen Betrag ein", nfts: "NFTs", shop: "Shop", nftEmpty: "Keine URI-Tokens auf diesem Konto.", nftMint: "URI-Token prägen", nftBurn: "Vernichten", nftSell: "Verkaufen", nftMakeOffer: "Angebot machen", nftCancelSale: "Verkauf abbrechen", nftForSale: "Zu verkaufen", nftEdition: "Ausgabe", nftUnavailable: "URI-Tokens sind nicht verfügbar.", nftAccept: "Annehmen", nftDecline: "Ablehnen", nftOffer: "Angebot", nftClose: "Schließen", nftCount: "{n} von {m}", nftAll: "Alle", nftOffers: "Angebote", nftNotForSale: "Nicht im Verkauf", nftNoMatch: "Nichts passt.", nftCopy: "Kopieren", nftCopied: "Kopiert", nftShare: "Teilen", nftShareShop: "Verkauf teilen", nftTweet: "Zu verkaufen auf Xahau", nftShop: "Alles im Verkauf", nftShopEmpty: "Nichts steht zum Verkauf.", nftOfferScan: "Scanne diesen Code, um ein Angebot zu machen.", nftPurchase: "Kaufen", nftMissing: "Dieses Token ist nicht auf diesem Konto." },
+  pt: { home: "Início", send: "Enviar", receive: "Receber", transfer: "Mover", scan: "Ler", activity: "Atividade", settings: "Ajustes", version: "Versão", general: "Geral", language: "Idioma", currencyFormat: "Formato do valor", formatHint: "Saldos e valores digitados usam este formato. Um QR guarda um valor simples.", firewall: "Firewall passkey", walletInterface: "Interface da carteira", installed: "Instalado", shipped: "Esta carteira", current: "Em dia", updateAvailable: "Atualização disponível", notInstalled: "Não instalado", notPublished: "Não publicada", updateFirewall: "Atualizar o firewall", updateWallet: "Instalar atualização", executionFee: "Taxa de execução", hookMatches: "Esta conta usa o firewall que vem com esta carteira.", hookDiffers: "Esta conta usa um firewall diferente do que vem com esta carteira.", hookMissing: "Não há firewall instalado nesta conta.", hookUnreadable: "A rede não devolveu a versão do firewall.", interfaceMatches: "A página publicada corresponde a esta carteira.", interfaceDiffers: "Uma página nova está pronta para esta conta.", interfaceMissing: "Esta conta ainda não tem página.", layout: "Layout", mobile: "Celular", desktop: "Computador", light: "Claro", dark: "Escuro", loading: "Carregando…", drops: "drops", amountInvalid: "Digite um valor", nfts: "NFTs", shop: "Loja", nftEmpty: "Não há URI tokens nesta conta.", nftMint: "Emitir um URI token", nftBurn: "Queimar", nftSell: "Vender", nftMakeOffer: "Fazer uma oferta", nftCancelSale: "Cancelar a venda", nftForSale: "À venda", nftEdition: "Edição", nftUnavailable: "Os URI tokens não estão disponíveis.", nftAccept: "Aceitar", nftDecline: "Recusar", nftOffer: "Oferta", nftClose: "Fechar", nftCount: "{n} de {m}", nftAll: "Todos", nftOffers: "Ofertas", nftNotForSale: "Sem venda", nftNoMatch: "Nada encontrado.", nftCopy: "Copiar", nftCopied: "Copiado", nftShare: "Compartilhar", nftShareShop: "Compartilhar à venda", nftTweet: "À venda na Xahau", nftShop: "Tudo à venda", nftShopEmpty: "Nada está à venda.", nftOfferScan: "Leia este código para fazer uma oferta.", nftPurchase: "Comprar", nftMissing: "Esse token não está nesta conta." },
+  zh: { home: "首页", send: "发送", receive: "收款", transfer: "收发", scan: "扫描", activity: "活动", settings: "设置", version: "版本", general: "通用", language: "语言", currencyFormat: "金额格式", formatHint: "余额和输入的金额使用此格式。二维码保存的是普通金额。", firewall: "Passkey 防火墙", walletInterface: "钱包界面", installed: "已安装", shipped: "此钱包", current: "已是最新", updateAvailable: "有可用更新", notInstalled: "未安装", notPublished: "未发布", updateFirewall: "更新防火墙", updateWallet: "安装更新", executionFee: "执行费用", hookMatches: "此账户运行的是本钱包附带的防火墙。", hookDiffers: "此账户运行的防火墙与本钱包附带的不同。", hookMissing: "此账户尚未安装防火墙。", hookUnreadable: "网络没有返回防火墙版本。", interfaceMatches: "已发布的页面与此钱包一致。", interfaceDiffers: "此账户有新的钱包页面可以安装。", interfaceMissing: "此账户还没有钱包页面。", layout: "布局", mobile: "手机", desktop: "电脑", light: "浅色", dark: "深色", loading: "正在加载…", drops: "drops", amountInvalid: "请输入金额", nfts: "NFTs", shop: "商店", nftEmpty: "此账户没有 URI 代币。", nftMint: "铸造 URI 代币", nftBurn: "销毁", nftSell: "出售", nftMakeOffer: "出价", nftCancelSale: "取消出售", nftForSale: "在售", nftEdition: "版次", nftUnavailable: "无法读取 URI 代币。", nftAccept: "接受", nftDecline: "拒绝", nftOffer: "报价", nftClose: "关闭", nftCount: "{n} / {m}", nftAll: "全部", nftOffers: "报价", nftNotForSale: "未出售", nftNoMatch: "没有匹配。", nftCopy: "复制", nftCopied: "已复制", nftShare: "分享", nftShareShop: "分享在售", nftTweet: "在 Xahau 出售", nftShop: "全部在售", nftShopEmpty: "没有在售的代币。", nftOfferScan: "扫描此码即可出价。", nftPurchase: "购买", nftMissing: "此账户没有该代币。" },
+  ja: { home: "ホーム", send: "送金", receive: "受取", transfer: "入出金", scan: "スキャン", activity: "履歴", settings: "設定", version: "バージョン", general: "一般", language: "言語", currencyFormat: "金額の形式", formatHint: "残高と入力する金額はこの形式です。QRコードには単純な金額が入ります。", firewall: "パスキーファイアウォール", walletInterface: "ウォレット画面", installed: "導入済み", shipped: "このウォレット", current: "最新", updateAvailable: "更新があります", notInstalled: "未導入", notPublished: "未公開", updateFirewall: "ファイアウォールを更新", updateWallet: "更新をインストール", executionFee: "実行手数料", hookMatches: "このアカウントは、このウォレットに同梱されたファイアウォールです。", hookDiffers: "このアカウントのファイアウォールは、このウォレットに同梱されたものと違います。", hookMissing: "このアカウントにはファイアウォールがありません。", hookUnreadable: "ネットワークがファイアウォールのバージョンを返しませんでした。", interfaceMatches: "公開中のページは、このウォレットと一致しています。", interfaceDiffers: "このアカウントに新しいページを入れられます。", interfaceMissing: "このアカウントにはまだページがありません。", layout: "レイアウト", mobile: "モバイル", desktop: "デスクトップ", light: "ライト", dark: "ダーク", loading: "読み込み中…", drops: "drops", amountInvalid: "金額を入力してください", nfts: "NFTs", shop: "ショップ", nftEmpty: "このアカウントに URI トークンはありません。", nftMint: "URI トークンを発行", nftBurn: "破棄", nftSell: "売却", nftMakeOffer: "オファーを出す", nftCancelSale: "売却を取り消す", nftForSale: "売却中", nftEdition: "エディション", nftUnavailable: "URI トークンを取得できません。", nftAccept: "受け取る", nftDecline: "辞退", nftOffer: "オファー", nftClose: "閉じる", nftCount: "{n} / {m}", nftAll: "すべて", nftOffers: "オファー", nftNotForSale: "未出品", nftNoMatch: "該当なし", nftCopy: "コピー", nftCopied: "コピーしました", nftShare: "共有", nftShareShop: "出品を共有", nftTweet: "Xahau で売却中", nftShop: "出品一覧", nftShopEmpty: "出品中のトークンはありません。", nftOfferScan: "このコードをスキャンしてオファーを出します。", nftPurchase: "買う", nftMissing: "このアカウントにそのトークンはありません。" },
+  ko: { home: "홈", send: "보내기", receive: "받기", transfer: "이체", scan: "스캔", activity: "활동", settings: "설정", version: "버전", general: "일반", language: "언어", currencyFormat: "금액 형식", formatHint: "잔액과 입력하는 금액이 이 형식을 사용합니다. QR 코드에는 일반 금액이 저장됩니다.", firewall: "패스키 방화벽", walletInterface: "지갑 화면", installed: "설치됨", shipped: "이 지갑", current: "최신", updateAvailable: "업데이트 있음", notInstalled: "설치되지 않음", notPublished: "게시되지 않음", updateFirewall: "방화벽 업데이트", updateWallet: "업데이트 설치", executionFee: "실행 수수료", hookMatches: "이 계정은 이 지갑에 포함된 방화벽을 사용합니다.", hookDiffers: "이 계정의 방화벽은 이 지갑에 포함된 것과 다릅니다.", hookMissing: "이 계정에는 방화벽이 설치되어 있지 않습니다.", hookUnreadable: "네트워크가 방화벽 버전을 반환하지 않았습니다.", interfaceMatches: "게시된 페이지가 이 지갑과 일치합니다.", interfaceDiffers: "이 계정에 새 지갑 페이지를 설치할 수 있습니다.", interfaceMissing: "이 계정에는 아직 지갑 페이지가 없습니다.", layout: "레이아웃", mobile: "모바일", desktop: "데스크톱", light: "라이트", dark: "다크", loading: "불러오는 중…", drops: "drops", amountInvalid: "금액을 입력하세요", nfts: "NFTs", shop: "상점", nftEmpty: "이 계정에는 URI 토큰이 없습니다.", nftMint: "URI 토큰 발행", nftBurn: "소각", nftSell: "판매", nftMakeOffer: "제안하기", nftCancelSale: "판매 취소", nftForSale: "판매 중", nftEdition: "에디션", nftUnavailable: "URI 토큰을 불러올 수 없습니다.", nftAccept: "수락", nftDecline: "거절", nftOffer: "제안", nftClose: "닫기", nftCount: "{n} / {m}", nftAll: "전체", nftOffers: "제안", nftNotForSale: "미판매", nftNoMatch: "일치하는 항목 없음", nftCopy: "복사", nftCopied: "복사함", nftShare: "공유", nftShareShop: "판매 공유", nftTweet: "Xahau에서 판매 중", nftShop: "판매 전체", nftShopEmpty: "판매 중인 토큰이 없습니다.", nftOfferScan: "이 코드를 스캔하면 제안할 수 있습니다.", nftPurchase: "구매", nftMissing: "이 계정에 그 토큰이 없습니다." },
 };
 var NAMES = { en: "English", es: "Español", fr: "Français", de: "Deutsch", pt: "Português", zh: "中文", ja: "日本語", ko: "한국어" };
 var sessionPref = {};
@@ -356,27 +356,7 @@ if (publishedRev !== INTERFACE_REV) {
   update.textContent = t("updateWallet");
   side.append(update);
 }
-if (!phone) {
-  settingsButton = document.createElement("button");
-  settingsButton.type = "button";
-  settingsButton.className = "g side";
-  settingsButton.dataset.i18n = "settings";
-  settingsButton.textContent = t("settings");
-  settingsButton.onclick = function () {
-    const layout = document.getElementById("layout");
-    if (!layout) {
-      wantSettings = !wantSettings;
-      settingsButton.classList.toggle("on", wantSettings);
-      return;
-    }
-    const open = layout.classList.toggle("settings-open");
-    wantSettings = open;
-    settingsButton.classList.toggle("on", open);
-    if (open) paintLedgerSettings();
-  };
-  side.append(settingsButton);
-  side.append(themeButton());
-}
+if (!phone) side.append(themeButton());
 
 const hash = new URLSearchParams(location.hash.slice(1));
 const txHash = hash.get("tx");
@@ -435,31 +415,153 @@ function tokenFace(object) {
   };
 }
 
-var SALE_PAGE = "https://shortthefomo.github.io/p-256-bootloader/sale.html";
+function accountHome(account, hash) {
+  var who = String(account || "");
+  if (!/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(who)) return "";
+  var url = "https://pwa.passkey.xahau-dev.net/" + who;
+  return hash ? url + "#" + hash : url;
+}
 
-function salePage(account, id) {
-  var owner = String(account || "");
-  if (!/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(owner)) return "";
-  var url = SALE_PAGE + "?account=" + encodeURIComponent(owner);
-  var token = String(id || "").toUpperCase();
-  if (!token) return url;
-  if (!/^[0-9A-F]{64}$/.test(token)) return "";
-  return url + "&id=" + encodeURIComponent(token);
+function signerBase() {
+  var base = String(S || "");
+  var cut = base.indexOf("?");
+  if (cut >= 0) base = base.slice(0, cut);
+  if (base && base.slice(-1) !== "/") base += "/";
+  return base;
+}
+
+function buyLink(object) {
+  var id = String(object && object.index || "").toUpperCase();
+  if (!/^[0-9A-F]{64}$/.test(id)) return "";
+  var amount = object.Amount;
+  var values = { id: id };
+  if (typeof amount === "string") {
+    if (!/^\d+$/.test(amount)) return "";
+    values.xah = xah(amount);
+  } else if (amount && typeof amount === "object" && amount.value && amount.currency) {
+    values.xah = String(amount.value);
+    values.currency = String(amount.currency);
+    if (amount.issuer) values.issuer = String(amount.issuer);
+  } else return "";
+  var json = JSON.stringify({ v: 1, a: "", k: "URITokenBuy", f: values });
+  var bytes = new TextEncoder().encode(json);
+  var bin = "";
+  for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  var encoded = btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return signerBase() + "?op=qr#p=" + encoded;
+}
+
+var qrReady = null;
+function whenQr(done) {
+  if (typeof globalThis.encodeQr === "function") {
+    done();
+    return;
+  }
+  var base = signerBase();
+  if (!base) return;
+  if (!qrReady) {
+    qrReady = import(base + "src/qr.mjs").then(function (mod) {
+      globalThis.encodeQr = mod.encodeQr;
+    }).catch(function () {});
+  }
+  qrReady.then(function () {
+    if (typeof globalThis.encodeQr === "function") done();
+  }).catch(function () {});
+}
+
+function qrCanvas(text) {
+  if (typeof globalThis.encodeQr !== "function") return null;
+  var qr = globalThis.encodeQr(text);
+  var quiet = 4;
+  var scale = 6;
+  var size = (qr.size + quiet * 2) * scale;
+  var canvas = document.createElement("canvas");
+  canvas.className = "qr";
+  canvas.width = String(size);
+  canvas.height = String(size);
+  var ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = "#102117";
+  for (var row = 0; row < qr.size; row++) {
+    for (var col = 0; col < qr.size; col++) {
+      if (!qr.modules[row * qr.size + col]) continue;
+      ctx.fillRect((col + quiet) * scale, (row + quiet) * scale, scale, scale);
+    }
+  }
+  return canvas;
+}
+
+function drawQr(text) {
+  var box = document.createElement("div");
+  box.className = "sale-qr";
+  var caption = document.createElement("p");
+  caption.className = "m";
+  caption.textContent = t("nftOfferScan");
+  box.append(caption);
+  whenQr(function () {
+    var canvas = qrCanvas(text);
+    if (canvas) box.insertBefore(canvas, caption);
+  });
+  return box;
 }
 
 function tweetPage(page, message) {
   return "https://x.com/intent/tweet?text=" + encodeURIComponent(message || "") + "&url=" + encodeURIComponent(page || "");
 }
 
-if (!phone) {
-  const shopLink = document.createElement("a");
-  shopLink.className = "b g side";
-  shopLink.href = salePage(acct);
-  shopLink.target = "_blank";
-  shopLink.rel = "noopener";
-  shopLink.dataset.i18n = "shop";
-  shopLink.textContent = t("shop");
-  side.insertBefore(shopLink, settingsButton);
+var deskButtons = {};
+
+function viewFromHash() {
+  var raw = (location.hash || "").replace(/^#/, "");
+  if (!raw || raw.indexOf("tx=") === 0 || raw.indexOf("err=") === 0 || raw.indexOf("declined=") === 0 || raw.indexOf("shell=") === 0) return "home";
+  if (raw.indexOf("token=") === 0) return "shop";
+  if (raw === "transfer") return "send";
+  if (["home", "send", "receive", "nfts", "shop", "activity", "settings"].indexOf(raw) >= 0) return raw;
+  return "home";
+}
+
+function showDesk(view) {
+  var layout = document.getElementById("layout");
+  var name = view || "home";
+  if (layout) {
+    layout.dataset.view = name;
+    if (name === "settings") paintLedgerSettings();
+    if (name === "shop") paintShopList();
+  }
+  var keys = Object.keys(deskButtons);
+  for (var i = 0; i < keys.length; i++) deskButtons[keys[i]].classList.toggle("on", keys[i] === name);
+}
+
+function deskItem(key, url) {
+  var node = document.createElement(url ? "a" : "button");
+  node.className = "tab";
+  node.dataset.i18n = key;
+  node.textContent = t(key);
+  if (url) node.href = url;
+  else {
+    node.type = "button";
+    node.onclick = function () {
+      try { location.hash = key === "home" ? "" : key; } catch (error) {}
+      showDesk(key);
+    };
+  }
+  deskButtons[key] = node;
+  return node;
+}
+
+function buildDeskNav(passkey) {
+  var menu = document.createElement("nav");
+  menu.className = "menu";
+  var items = [deskItem("home")];
+  if (passkey) items.push(deskItem("send"), deskItem("receive"), deskItem("nfts"));
+  items.push(deskItem("shop"));
+  if (passkey) items.push(deskItem("activity"));
+  items.push(deskItem("scan", href("scan")), deskItem("settings"));
+  menu.append.apply(menu, items);
+  var theme = side.querySelector("button.theme");
+  if (theme) side.insertBefore(menu, theme);
+  else side.append(menu);
 }
 
 function copyId(id) {
@@ -626,7 +728,7 @@ function paintShop() {
   for (var i = 0; i < all.length; i++) {
     if (!all[i].offer && tokenListed(all[i].object)) selling = true;
   }
-  var page = selling ? salePage(acct) : "";
+  var page = selling ? accountHome(acct, "shop") : "";
   nftShop.hidden = !page;
   if (!page) return;
   nftShop.href = tweetPage(page, t("nftTweet"));
@@ -674,6 +776,7 @@ function paintGallery() {
   nftNote.textContent = all.length ? (items.length ? "" : t("nftNoMatch")) : t("nftEmpty");
   for (let i = 0; i < items.length; i++) nftList.append(galleryButton(items[i]));
   if (nftOverlay && !nftOverlay.hidden && !ensureViewer()) closeViewer();
+  paintShopList();
 }
 
 function galleryButton(item) {
@@ -714,6 +817,153 @@ function galleryButton(item) {
     for (var n = 0; n < all.length; n++) if (all[n] === item) openViewer(n);
   };
   return button;
+}
+
+var shopList = null;
+var shopNote = null;
+var shopBody = null;
+
+function listedItems() {
+  var all = viewerItems();
+  var out = [];
+  for (var i = 0; i < all.length; i++) {
+    if (!all[i].offer && tokenListed(all[i].object)) out.push(all[i]);
+  }
+  return out;
+}
+
+function tokenFocus() {
+  var raw = (location.hash || "").replace(/^#/, "");
+  if (raw.indexOf("token=") !== 0) return "";
+  var id = raw.slice(6).toUpperCase();
+  return /^[0-9A-F]{64}$/.test(id) ? id : "";
+}
+
+function openShopToken(id) {
+  try { location.hash = "token=" + id; } catch (error) {}
+  if (phone) show("shop");
+  else showDesk("shop");
+  paintShopList();
+}
+
+function shopCard(item) {
+  var face = tokenFace(item.object);
+  var button = document.createElement("button");
+  button.type = "button";
+  button.className = "nft listed";
+  var copy = document.createElement("div");
+  copy.className = "nft-body";
+  var title = document.createElement("strong");
+  title.textContent = face.title;
+  copy.append(title);
+  var shown = saleText(item.object.Amount);
+  var status = document.createElement("p");
+  status.className = "nft-status";
+  var state = document.createElement("span");
+  state.className = "nft-state";
+  state.textContent = t("nftForSale");
+  status.append(state);
+  if (shown) {
+    var priceBit = document.createElement("span");
+    priceBit.className = "nft-pricebit";
+    priceBit.textContent = shown;
+    status.append(priceBit);
+  }
+  copy.append(status);
+  button.append(artFrame(face), copy);
+  var id = String(item.object.index || "").toUpperCase();
+  button.onclick = function () { if (id) openShopToken(id); };
+  return button;
+}
+
+function shopItem(item) {
+  var face = tokenFace(item.object);
+  var id = String(item.object.index || "").toUpperCase();
+  var offer = buyLink(item.object);
+  var page = accountHome(item.object.Owner || acct, "token=" + id);
+  var direct = document.createElement("div");
+  direct.className = "sale-direct";
+  var left = document.createElement("div");
+  left.className = "sale-item";
+  var title = document.createElement("h2");
+  title.textContent = face.title;
+  var owner = document.createElement("p");
+  owner.className = "m mono";
+  owner.textContent = item.object.Owner || acct;
+  var card = document.createElement("div");
+  card.className = tokenListed(item.object) ? "nft listed sale-one" : "nft held sale-one";
+  var body = document.createElement("div");
+  body.className = "nft-body";
+  var name = document.createElement("strong");
+  name.textContent = face.title;
+  body.append(name);
+  var shown = saleText(item.object.Amount);
+  if (shown) {
+    var price = document.createElement("p");
+    price.className = "nft-price";
+    price.textContent = shown;
+    body.append(price);
+  }
+  card.append(artFrame(face), body);
+  left.append(title, owner, card);
+  if (id) left.append(copyId(id));
+  var right = document.createElement("div");
+  right.className = "sale-actions";
+  if (offer) right.append(drawQr(offer));
+  if (offer) {
+    var buy = document.createElement("a");
+    buy.className = "b sale-buy";
+    buy.href = offer;
+    buy.textContent = t("nftPurchase");
+    right.append(buy);
+  }
+  var links = document.createElement("div");
+  links.className = "sale-links";
+  if (page) links.append(shareLink(page, t("nftShare"), face.title + " · " + t("nftTweet")));
+  var back = document.createElement("a");
+  back.className = "b g";
+  back.href = "#shop";
+  back.textContent = t("nftShop");
+  back.onclick = function (event) {
+    event.preventDefault();
+    try { location.hash = "shop"; } catch (error) {}
+    if (phone) show("shop");
+    else showDesk("shop");
+    paintShopList();
+  };
+  links.append(back);
+  right.append(links);
+  direct.append(left, right);
+  return direct;
+}
+
+function paintShopList() {
+  if (!shopList || !shopNote || !shopBody) return;
+  var focus = tokenFocus();
+  var items = listedItems();
+  shopList.replaceChildren();
+  shopBody.replaceChildren();
+  shopNote.textContent = "";
+  if (focus) {
+    var found = null;
+    var all = viewerItems();
+    for (var i = 0; i < all.length; i++) {
+      if (!all[i].offer && String(all[i].object.index || "").toUpperCase() === focus) found = all[i];
+    }
+    shopList.hidden = true;
+    if (!found) {
+      shopNote.textContent = ownedNodes.length ? t("nftMissing") : t("loading");
+      return;
+    }
+    shopBody.append(shopItem(found));
+    return;
+  }
+  shopList.hidden = false;
+  if (!items.length) {
+    shopNote.textContent = ownedNodes.length ? t("nftShopEmpty") : t("loading");
+    return;
+  }
+  for (var n = 0; n < items.length; n++) shopList.append(shopCard(items[n]));
 }
 
 function paintTokens(objects) {
@@ -1040,7 +1290,7 @@ function paintOverlay() {
     nftActions.append(nftLink("nftBurn", { act: "burn", id: id }, true));
   }
   var owner = item.object.Owner || acct;
-  var shared = salePage(owner, tokenId);
+  var shared = accountHome(owner, tokenId ? "token=" + tokenId : "shop");
   if (shared) {
     var blurb = item.offer || listed ? face.title + " · " + t("nftTweet") : face.title;
     nftActions.append(shareLink(shared, t("nftShare"), blurb));
@@ -1618,14 +1868,25 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
   nftShop.hidden = true;
   filterBar.append(nftFilters, nftIssuers, nftShop);
   nftPanel.append(heading("nfts"), filterBar, nftNote, nftList);
+  const shopPanel = panel("shop");
+  shopNote = document.createElement("p");
+  shopNote.className = "m";
+  shopNote.textContent = t("loading");
+  shopList = document.createElement("div");
+  shopList.className = "nft-grid";
+  shopBody = document.createElement("div");
+  shopPanel.append(heading("shop"), shopNote, shopList, shopBody);
   rpc("account_objects", { account: acct, type: "uri_token", ledger_index: "validated" }).then(function (page) {
     paintTokens(page.account_objects || []);
-  }).catch(function () { if (nftNote) nftNote.textContent = t("nftUnavailable"); });
+  }).catch(function () {
+    if (nftNote) nftNote.textContent = t("nftUnavailable");
+    if (shopNote) shopNote.textContent = t("nftUnavailable");
+  });
 
   const layout = document.createElement("div");
   layout.id = "layout";
   if (passkey) layout.append(sendPanel, receivePanel, activityPanel, nftPanel);
-  layout.append(settingsPanel);
+  layout.append(shopPanel, settingsPanel);
   if (phone) {
     const tabs = document.createElement("nav");
     tabs.className = "tabs";
@@ -1643,8 +1904,15 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
       button.textContent = t(key);
       button.title = t(key);
       if (!url) button.onclick = function () {
+        if (id === "shop") {
+          var raw = (location.hash || "").replace(/^#/, "");
+          if (raw.indexOf("token=") !== 0) {
+            try { location.hash = "shop"; } catch (error) {}
+          }
+        }
         show(id);
         if (id === "settings") paintLedgerSettings();
+        if (id === "shop") paintShopList();
       };
       tabs.append(button);
     }
@@ -1652,17 +1920,20 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
       addTab("transfer", "transfer");
       addTab("scan", "scan", href("scan"));
       addTab("nfts", "nfts");
-      addTab("shop", "shop", salePage(acct), true);
+      addTab("shop", "shop");
       addTab("activity", "activity");
-    } else addTab("shop", "shop", salePage(acct), true);
+    } else addTab("shop", "shop");
     addTab("settings", "settings");
     slot.append(tabs, layout);
-    var section = (location.hash || "").replace(/^#/, "");
-    if (section === "shop") section = "nfts";
+    var section = viewFromHash();
     if (section === "settings") {
       show("settings");
       paintLedgerSettings();
+    } else if (section === "shop") {
+      show("shop");
+      paintShopList();
     } else if (passkey && (section === "nfts" || section === "activity")) show(section);
+    else if (passkey && (section === "send" || section === "receive")) show("transfer");
     else if (passkey) show("transfer");
     else {
       show("settings");
@@ -1670,14 +1941,7 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
     }
   } else {
     slot.append(layout);
-    var opened = (location.hash || "").replace(/^#/, "");
-    if (opened === "settings" || wantSettings) {
-      layout.classList.add("settings-open");
-      if (settingsButton) settingsButton.classList.add("on");
-      paintLedgerSettings();
-    } else if (opened) {
-      var jump = document.getElementById(opened === "transfer" ? "send" : opened);
-      if (jump && jump.scrollIntoView) jump.scrollIntoView();
-    }
+    buildDeskNav(passkey);
+    showDesk(viewFromHash());
   }
 }).catch(function () { $("g").textContent = "Hook state unavailable"; });

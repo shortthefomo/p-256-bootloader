@@ -294,18 +294,27 @@ html[data-shell="phone"] button.theme {
 html[data-shell="phone"] .panel h2 { display: none; }
 html[data-shell="phone"] #settings h2,
 html[data-shell="phone"] #send h2,
-html[data-shell="phone"] #receive h2 { display: block; }
+html[data-shell="phone"] #receive h2,
+html[data-shell="phone"] #shop h2 { display: block; }
 html[data-shell="phone"] #receive.on { margin-top: 1.4rem; padding-top: 0.35rem; border-top: 1px solid var(--line); }
 .seg { display: flex; gap: 0.4rem; margin: 0 0 1rem; }
 .seg button { flex: 1 1 0; width: auto; margin: 0; padding: 0.55rem 0.4rem; background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 650; }
 .seg button.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .warn { color: var(--warn); }
-html[data-shell="desk"] #settings { display: none; grid-column: 1 / -1; }
-html[data-shell="desk"] #layout.settings-open #send,
-html[data-shell="desk"] #layout.settings-open #receive,
-html[data-shell="desk"] #layout.settings-open #activity,
-html[data-shell="desk"] #layout.settings-open #nfts { display: none; }
-html[data-shell="desk"] #layout.settings-open #settings { display: block; }
+html[data-shell="desk"] nav.menu { display: flex; flex-direction: column; gap: 0.15rem; margin-top: 1.1rem; }
+html[data-shell="desk"] nav.menu button.tab,
+html[data-shell="desk"] nav.menu a.tab { display: block; width: 100%; box-sizing: border-box; margin: 0; padding: 0.7rem 0.85rem; border: 0; border-radius: 0.7rem; background: transparent; color: var(--muted); font: inherit; font-weight: 650; text-align: left; text-decoration: none; }
+html[data-shell="desk"] nav.menu button.tab.on,
+html[data-shell="desk"] nav.menu a.tab.on { background: var(--accent); color: var(--accent-ink); }
+html[data-shell="desk"] #layout[data-view="home"] #shop,
+html[data-shell="desk"] #layout[data-view="home"] #settings { display: none; }
+html[data-shell="desk"] #layout:not([data-view="home"]) .panel { display: none; }
+html[data-shell="desk"] #layout[data-view="send"] #send,
+html[data-shell="desk"] #layout[data-view="receive"] #receive,
+html[data-shell="desk"] #layout[data-view="nfts"] #nfts,
+html[data-shell="desk"] #layout[data-view="shop"] #shop,
+html[data-shell="desk"] #layout[data-view="activity"] #activity,
+html[data-shell="desk"] #layout[data-view="settings"] #settings { display: block; grid-column: 1 / -1; }
 label.setting { display: flex; flex-direction: column; gap: 0.25rem; margin: 0 0 0.8rem; color: var(--muted); font-size: 0.8125rem; font-weight: 650; }
 .kv { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 0.35rem 0.75rem; margin: 0.2rem 0 0.6rem; font-size: 0.8125rem; }
 .kv span:nth-child(odd) { color: var(--muted); }
