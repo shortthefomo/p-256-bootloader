@@ -1043,6 +1043,9 @@ function focusToken() {
   var all = viewerItems();
   for (var i = 0; i < all.length; i++) {
     if (String(all[i].object.index || "").toUpperCase() === id) {
+      // A closed ledger calls this again. Reopening would replace the price
+      // field the owner is typing in.
+      if (nftOverlay && !nftOverlay.hidden && viewerPos === i) return;
       openViewer(i);
       return;
     }
@@ -1229,6 +1232,7 @@ function slideViewer(delta) {
     placePage(delta > 0 ? width : -width, false);
     viewerPos = dest;
     paintOverlay();
+    pinToken();
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
         placePage(0, true);
@@ -1266,6 +1270,7 @@ function stepViewer(delta) {
     placePage(0, false);
     viewerPos = dest;
     paintOverlay();
+    pinToken();
     return;
   }
   slideViewer(delta);
@@ -1313,6 +1318,7 @@ function offerBox(id) {
     }
   };
   paintHref();
+  box.dataset.id = String(id);
   box.append(price, buyer, go);
   return box;
 }
@@ -1339,7 +1345,14 @@ function openViewer(index) {
   paintOverlay();
   nftOverlay.hidden = false;
   if (phone) show("nfts");
-  var tokenId = String(items[viewerPos].object.index || "").toUpperCase();
+  pinToken();
+}
+
+function pinToken() {
+  var items = viewerItems();
+  var item = items[viewerPos];
+  if (!item) return;
+  var tokenId = String(item.object.index || "").toUpperCase();
   if (/^[0-9A-F]{64}$/.test(tokenId) && tokenFocus() !== tokenId) putHash({ token: tokenId });
 }
 
@@ -1376,10 +1389,25 @@ function paintOverlay() {
   }
   var tokenId = String(item.object.index || "").toUpperCase();
   if (tokenId) nftCaption.append(copyId(tokenId));
-  nftActions.replaceChildren();
   var id = String(item.object.index || "");
+  // Leave the sale form in the document when this same token is redrawn.
+  // Replacing it clears the price and buyer the owner is typing.
+  var priorSale = nftActions.querySelector(".nft-sell");
+  var keepSale = !!(priorSale && priorSale.dataset.id === id && walletOwner && !item.offer);
+  if (keepSale) {
+    var child = nftActions.firstChild;
+    while (child) {
+      var next = child.nextSibling;
+      if (child !== priorSale) child.remove();
+      child = next;
+    }
+  } else nftActions.replaceChildren();
+  function placeAction(node) {
+    if (keepSale) nftActions.insertBefore(node, priorSale);
+    else nftActions.append(node);
+  }
   if (walletOwner && item.offer) {
-    nftActions.append(nftLink("nftAccept", { act: "buy", id: item.offer.id, xah: item.offer.xah }, false));
+    placeAction(nftLink("nftAccept", { act: "buy", id: item.offer.id, xah: item.offer.xah }, false));
     var decline = document.createElement("button");
     decline.type = "button";
     decline.className = "g";
@@ -1393,21 +1421,23 @@ function paintOverlay() {
       if (!ensureViewer()) closeViewer();
       else paintOverlay();
     };
-    nftActions.append(decline);
+    placeAction(decline);
   } else if (walletOwner) {
-    if (item.object.Amount) nftActions.append(nftLink("nftCancelSale", { act: "cancel", id: id }, true));
-    nftActions.append(nftLink("nftBurn", { act: "burn", id: id }, true));
+    if (item.object.Amount) placeAction(nftLink("nftCancelSale", { act: "cancel", id: id }, true));
+    placeAction(nftLink("nftBurn", { act: "burn", id: id }, true));
   } else if (listed) {
     var buying = buyerActions(item.object);
-    if (buying) nftActions.append(buying);
+    if (buying) placeAction(buying);
   }
   var owner = item.object.Owner || acct;
   var shared = accountHome(owner, tokenId ? "token=" + tokenId : "nfts");
   if (shared) {
     var blurb = item.offer || listed ? face.title + " · " + t("nftTweet") : face.title;
-    nftActions.append(shareLink(shared, t("nftShare"), blurb));
+    placeAction(shareLink(shared, t("nftShare"), blurb));
   }
-  if (walletOwner && !item.offer) nftActions.append(offerBox(id));
+  if (!keepSale) {
+    if (walletOwner && !item.offer) nftActions.append(offerBox(id));
+  }
   var list = filteredItems();
   var placeInList = itemIndex(list, item);
   if (placeInList < 0) placeInList = 0;
