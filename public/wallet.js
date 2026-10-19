@@ -192,9 +192,9 @@ function t(key) {
 }
 
 function fill(key, vars) {
-  var text = t(key);
+  var text = String(t(key));
   Object.keys(vars).forEach(function (name) {
-    text = text.split("{" + name + "}", String(vars[name]));
+    text = text.split("{" + name + "}").join(String(vars[name]));
   });
   return text;
 }
