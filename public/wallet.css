@@ -295,6 +295,7 @@ html[data-shell="phone"] button.theme {
 }
 html[data-shell="phone"] .panel h2 { display: none; }
 html[data-shell="phone"] #settings h2,
+html[data-shell="phone"] #transfer h2,
 html[data-shell="phone"] #send h2,
 html[data-shell="phone"] #receive h2,
 html[data-shell="phone"] #shop h2 { display: block; }
@@ -309,7 +310,8 @@ html[data-shell="desk"] nav.menu a.tab { display: block; width: 100%; box-sizing
 html[data-shell="desk"] nav.menu button.tab.on,
 html[data-shell="desk"] nav.menu a.tab.on { background: var(--accent); color: var(--accent-ink); }
 html[data-shell="desk"] #layout[data-view="home"] #shop,
-html[data-shell="desk"] #layout[data-view="home"] #settings { display: none; }
+html[data-shell="desk"] #layout[data-view="home"] #settings,
+html[data-shell="desk"] #layout[data-view="home"] #transfer { display: none; }
 html[data-shell="desk"] #layout:not([data-view="home"]) .panel { display: none; }
 html[data-shell="desk"] #layout[data-view="transfer"] #transfer,
 html[data-shell="desk"] #layout[data-view="send"] #transfer,
@@ -404,7 +406,28 @@ html[data-shell="desk"] .panel {
 html[data-shell="desk"] #activity,
 html[data-shell="desk"] #nfts,
 html[data-shell="desk"] #transfer { grid-column: 1 / -1; min-width: 0; }
-html[data-shell="desk"] #transfer { max-width: 32rem; padding: 0; overflow: hidden; }
+html[data-shell="desk"] #transfer { max-width: none; padding: 1.2rem 1.4rem 1.45rem; }
+html[data-shell="desk"] #transfer .seg { max-width: 22rem; }
+html[data-shell="desk"] #transfer .pay-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 24rem);
+  grid-template-areas: "main side" "other side";
+  gap: 0.5rem 2.5rem;
+  align-items: start;
+}
+html[data-shell="desk"] #transfer .pay-main { grid-area: main; }
+html[data-shell="desk"] #transfer .pay-side { grid-area: side; }
+html[data-shell="desk"] #transfer .pay-other { grid-area: other; }
+html[data-shell="desk"] #transfer .pay-side .b,
+html[data-shell="desk"] #transfer .pay-side button { margin-top: 0; }
+html[data-shell="phone"] #transfer .pay-split { display: flex; flex-direction: column; }
+html[data-shell="phone"] #transfer .pay-main { order: 1; }
+html[data-shell="phone"] #transfer .pay-side { order: 2; }
+html[data-shell="phone"] #transfer .pay-other { order: 3; }
+html[data-shell="phone"] #transfer[data-mode="receive"] .pay-side { order: 0; }
+.addr { display: flex; align-items: center; gap: 0.6rem; margin: 0.2rem 0 0.6rem; }
+.addr .mono { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 0.78rem; }
+.addr button { width: auto; margin: 0; padding: 0.45rem 0.7rem; }
 html[data-shell="desk"] #layout #transfer > .panel { display: block; margin: 0; background: transparent; border: 0; border-radius: 0; }
 html[data-shell="desk"] #layout #transfer > #receive { border-top: 1px solid var(--line); }
 html[data-shell="desk"] #nfts .nft { background: var(--surface-2); }

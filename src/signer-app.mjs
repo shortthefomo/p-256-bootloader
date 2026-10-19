@@ -188,18 +188,6 @@ function walletReturn(account, place) {
   return parts.length ? `${back}#${parts.join("&")}` : back;
 }
 
-function transferPage(account) {
-  const url = new URL(location.href);
-  url.hash = "";
-  url.search = "";
-  url.searchParams.set("op", "send");
-  url.searchParams.set("account", account);
-  const back = params.get("return") || "";
-  if (back) url.searchParams.set("return", back);
-  if (params.get("logged") === "1") url.searchParams.set("logged", "1");
-  return url.href;
-}
-
 function walletReturnLink(account) {
   const next = walletReturn(account);
   if (!next) return null;
@@ -2248,7 +2236,7 @@ function phoneScanNav(account) {
   nav.replaceChildren(...items.map(([id, place]) => {
     const label = text(id);
     if (!place) return el("button", { class: "tab on", type: "button", title: label }, [label]);
-    const href = id === "transfer" ? transferPage(account) : walletReturn(account, place);
+    const href = walletReturn(account, place);
     if (!href) return el("button", { class: "tab", type: "button", title: label }, [label]);
     return el("a", { class: "tab", href, title: label }, [label]);
   }));
@@ -2644,13 +2632,13 @@ async function main() {
     location.assign(walletReturn(account, place));
     return;
   }
-  if (op === "send" || op === "transfer") {
+  if (op === "send" || op === "transfer" || op === "receive") {
     const account = isAddress(named) ? named : savedAccount();
     if (!isAddress(account)) {
       home();
       return;
     }
-    sendForm(account);
+    location.assign(walletReturn(account, op === "receive" ? "receive" : "transfer"));
     return;
   }
   if (!globalThis.PublicKeyCredential && shell() === "phone" && op !== "scan" && op !== "receive" && op !== "settings" && op !== "update" && op !== "nfts") {
@@ -2678,15 +2666,6 @@ async function main() {
       const account = params.get("account") || savedAccount();
       if (isAddress(account)) rememberAccount(account);
       scan(account);
-      return;
-    }
-    if (op === "receive") {
-      const account = params.get("account") || savedAccount();
-      if (!isAddress(account)) {
-        home();
-        return;
-      }
-      receive(account);
       return;
     }
     if (op === "pay") {
