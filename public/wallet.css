@@ -338,7 +338,8 @@ html[data-shell="desk"] nav.menu button.tab.on,
 html[data-shell="desk"] nav.menu a.tab.on { background: var(--accent); color: var(--accent-ink); }
 html[data-shell="desk"] #layout[data-view="home"] #shop,
 html[data-shell="desk"] #layout[data-view="home"] #settings,
-html[data-shell="desk"] #layout[data-view="home"] #transfer { display: none; }
+html[data-shell="desk"] #layout[data-view="home"] #transfer,
+html[data-shell="desk"] #layout[data-view="home"] #nfts { display: none; }
 html[data-shell="desk"] #layout:not([data-view="home"]) .panel { display: none; }
 html[data-shell="desk"] #layout[data-view="transfer"] #transfer,
 html[data-shell="desk"] #layout[data-view="send"] #transfer,
@@ -433,6 +434,16 @@ html[data-shell="desk"] .panel {
 html[data-shell="desk"] #activity,
 html[data-shell="desk"] #nfts,
 html[data-shell="desk"] #transfer { grid-column: 1 / -1; min-width: 0; }
+html[data-shell="desk"] #layout[data-view="home"] {
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  align-items: start;
+}
+html[data-shell="desk"] #layout[data-view="home"] #activity { grid-column: 1; min-width: 0; }
+html[data-shell="desk"] #layout[data-view="home"] #home-receive { grid-column: 2; min-width: 0; }
+@media (max-width: 1100px) {
+  html[data-shell="desk"] #layout[data-view="home"] { grid-template-columns: minmax(0, 1fr); }
+  html[data-shell="desk"] #layout[data-view="home"] #home-receive { grid-column: 1; }
+}
 html[data-shell="desk"] #transfer { max-width: none; padding: 1.2rem 1.4rem 1.45rem; }
 html[data-shell="desk"] #transfer .seg { max-width: 22rem; }
 html[data-shell="desk"] #transfer .pay-split {
@@ -480,6 +491,21 @@ html[data-shell="desk"] .tx {
 html[data-shell="desk"] .tx.offer { grid-template-columns: 2.6rem 9.5rem minmax(0, 1fr) auto; grid-template-areas: "art type main end"; }
 html[data-shell="desk"] .tx-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html[data-shell="desk"] .tx-main { font-size: 0.95rem; color: var(--text); }
+html[data-shell="desk"] #layout[data-view="home"] #activity .tx-head { display: none; }
+html[data-shell="desk"] #layout[data-view="home"] #activity .tx:not(.offer) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "main end";
+}
+html[data-shell="desk"] #layout[data-view="home"] #activity .tx:not(.offer) .tx-type { display: none; }
+html[data-shell="desk"] #layout[data-view="home"] #activity .tx:not(.offer) .tx-main {
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--text);
+}
+html[data-shell="desk"] #layout[data-view="home"] #activity .tx.offer {
+  grid-template-columns: 2.4rem minmax(0, 1fr) auto;
+  grid-template-areas: "art type end" "art main end";
+}
 @media (max-width: 720px) {
   html[data-shell="desk"] .tx-head { display: none; }
   html[data-shell="desk"] .tx {

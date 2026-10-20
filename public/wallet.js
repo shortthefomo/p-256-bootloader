@@ -666,7 +666,8 @@ function showDesk(view) {
     layout.dataset.view = name;
     if (name === "settings") paintLedgerSettings();
     if (name === "transfer") paintTransfer();
-    if (name === "home" || name === "activity") moreActivity();
+    if ((name === "home" || name === "activity") && activityRows.length) paintActivity(activityRows, offerNodes);
+    if (name === "activity") moreActivity();
     if (nftOverlay && !nftOverlay.hidden && name !== "nfts" && name !== "home" && name !== "activity") closeViewer();
   }
   var keys = Object.keys(deskButtons);
@@ -839,6 +840,7 @@ var ownedNodes = [];
 var offerNodes = {};
 var activityRows = [];
 var ACTIVITY_PAGE = 50;
+var HOME_ACTIVITY = 20;
 var activityMarker = null;
 var activityBusy = false;
 var activityAgain = false;
@@ -1537,11 +1539,20 @@ function liveOffer(tx, token) {
   return { id: id, xah: xah(amount), key: id + ":" + token.Owner + ":" + amount };
 }
 
+function homeActivity() {
+  if (phone) return false;
+  var layout = document.getElementById("layout");
+  if (!layout) return false;
+  return (layout.dataset.view || "home") === "home";
+}
+
 function paintActivity(rows, tokens) {
   if (!activityPanel || !activityNote || !activityList) return;
   const old = activityList.querySelectorAll(".tx");
   for (let i = 0; i < old.length; i++) old[i].remove();
-  const list = rows || [];
+  const source = rows || [];
+  const list = homeActivity() ? source.slice(0, HOME_ACTIVITY) : source;
+  if (homeActivity() && activityMoreNote) activityMoreNote.hidden = true;
   const offers = tokens || {};
   const declined = declinedOffers();
   const used = {};
@@ -1635,7 +1646,9 @@ function paintActivity(rows, tokens) {
       typeNode.textContent = type;
       const main = document.createElement("span");
       main.className = "tx-main";
-      main.textContent = txDetail(type, line);
+      var detail = txDetail(type, line);
+      if (homeActivity() && !detail) detail = type;
+      main.textContent = detail;
       row.append(typeNode, main, end);
     }
     activityList.append(row);
@@ -1721,8 +1734,7 @@ function activityVisible() {
   if (!panel) return false;
   if (phone) return panel.classList.contains("on");
   var layout = document.getElementById("layout");
-  var view = layout && layout.dataset.view || "home";
-  return view === "home" || view === "activity";
+  return (layout && layout.dataset.view) === "activity";
 }
 
 function activityNearEnd() {
@@ -2300,6 +2312,44 @@ function addressLine(value) {
   return row;
 }
 
+function homeReceive() {
+  var node = panel("home-receive");
+  var box = document.createElement("div");
+  box.className = "qrbox";
+  var hint = document.createElement("p");
+  hint.className = "m";
+  hint.dataset.i18n = "receiveHint";
+  hint.textContent = t("receiveHint");
+  var request = document.createElement("input");
+  request.type = "text";
+  request.inputMode = "decimal";
+  request.autocomplete = "off";
+  request.setAttribute("data-placeholder", "requestAmount");
+  request.placeholder = t("requestAmount");
+  var warn = document.createElement("p");
+  warn.className = "warn";
+  warn.hidden = true;
+  var paintCode = function () {
+    var typed = canonicalAmount(request.value);
+    if (request.value.trim() && !typed) {
+      warn.hidden = false;
+      warn.textContent = t("amountInvalid");
+      return;
+    }
+    warn.hidden = true;
+    warn.textContent = "";
+    var code = receiveCode(typed);
+    whenQr(function () {
+      var canvas = qrCanvas(code);
+      if (canvas) box.replaceChildren(canvas);
+    });
+  };
+  request.addEventListener("input", paintCode);
+  node.append(labeled("receive"), box, hint, addressLine(acct), request, warn);
+  paintCode();
+  return node;
+}
+
 rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index: "validated" }).then(function (ns) {
   const entries = ns.namespace_entries || ns.namespaceEntries || [];
   const passkey = entries.some(function (entry) {
@@ -2385,7 +2435,10 @@ rpc("account_namespace", { account: acct, namespace_id: NAMESPACE, ledger_index:
 
   const layout = document.createElement("div");
   layout.id = "layout";
-  if (walletOwner) layout.append(activityPanel, transferPanel);
+  if (walletOwner) {
+    layout.append(activityPanel, transferPanel);
+    if (!phone) layout.append(homeReceive());
+  }
   layout.append(nftPanel);
   if (walletOwner) layout.append(settingsPanel);
   if (phone) {
