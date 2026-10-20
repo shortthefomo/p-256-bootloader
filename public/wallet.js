@@ -846,6 +846,8 @@ var activityBusy = false;
 var activityAgain = false;
 var activityDone = false;
 var activityOlder = false;
+var activityFloor = 0;
+var activityPrevLedger = 0;
 var activityMoreNote = null;
 var viewerPos = 0;
 var nftMode = "all";
@@ -1546,6 +1548,20 @@ function homeActivity() {
   return (layout.dataset.view || "home") === "home";
 }
 
+function activityStatus(count) {
+  if (count) return "";
+  if (activityPrevLedger && activityFloor && activityPrevLedger < activityFloor) {
+    return "The network no longer has these older transactions.";
+  }
+  return "No transactions yet.";
+}
+
+function noteAccountLedger(info) {
+  var seq = Number(info && info.account_data && info.account_data.PreviousTxnLgrSeq);
+  if (seq) activityPrevLedger = seq;
+  if (activityNote && !activityRows.length) activityNote.textContent = activityStatus(0);
+}
+
 function paintActivity(rows, tokens) {
   if (!activityPanel || !activityNote || !activityList) return;
   const old = activityList.querySelectorAll(".tx");
@@ -1556,7 +1572,7 @@ function paintActivity(rows, tokens) {
   const offers = tokens || {};
   const declined = declinedOffers();
   const used = {};
-  activityNote.textContent = list.length ? "" : "No transactions yet.";
+  activityNote.textContent = activityStatus(list.length);
   for (let i = 0; i < list.length; i++) {
     const entry = list[i];
     const tx = entry.tx_json || entry.tx || {};
@@ -1679,23 +1695,27 @@ function txKey(entry) {
 
 function applyActivityPage(page, older) {
   var batch = page.transactions || [];
-  if (!older && !activityOlder) {
-    activityRows = batch;
-    activityMarker = page.marker || null;
-    activityDone = !page.marker;
-  } else if (!older) {
+  if (page.ledger_index_min) activityFloor = page.ledger_index_min;
+  if (!older) {
     var seen = {};
-    var fresh = [];
-    for (var i = 0; i < activityRows.length; i++) {
-      var key = txKey(activityRows[i]);
-      if (key) seen[key] = 1;
-    }
-    for (var j = 0; j < batch.length; j++) {
-      var id = txKey(batch[j]);
+    var next = [];
+    for (var i = 0; i < batch.length; i++) {
+      var id = txKey(batch[i]);
       if (id && seen[id]) continue;
-      fresh.push(batch[j]);
+      if (id) seen[id] = 1;
+      next.push(batch[i]);
     }
-    if (fresh.length) activityRows = fresh.concat(activityRows);
+    for (var j = 0; j < activityRows.length; j++) {
+      var key = txKey(activityRows[j]);
+      if (key && seen[key]) continue;
+      if (key) seen[key] = 1;
+      next.push(activityRows[j]);
+    }
+    activityRows = next;
+    if (!activityOlder) {
+      activityMarker = page.marker || null;
+      activityDone = !page.marker;
+    }
   } else {
     var before = activityRows.length;
     var have = {};
@@ -1807,6 +1827,7 @@ function refreshHome() {
   refreshing = true;
   const infoP = rpc("account_info", { account: acct, ledger_index: "validated" }).then(function (info) {
     paintBalance(info.account_data.Balance);
+    noteAccountLedger(info);
   });
   const txP = refreshActivity();
   const lineP = rpc("account_lines", { account: acct, ledger_index: "validated" }).then(function (page) {
@@ -1827,6 +1848,7 @@ function refreshHome() {
 function startOwnerFeeds() {
   rpc("account_info", { account: acct, ledger_index: "validated" }).then(function (info) {
     paintBalance(info.account_data.Balance);
+    noteAccountLedger(info);
   }).catch(function (error) { showNote(error.message); });
 
   rpc("account_lines", { account: acct, ledger_index: "validated" }).then(function (page) {
@@ -2208,20 +2230,20 @@ function paintTransfer() {
       warn.textContent = "";
       return href("pay", { dest: dest, xah: typed });
     };
+    var review = document.createElement("a");
+    review.className = "b";
+    review.href = "#transfer";
+    review.dataset.i18n = "review";
+    review.textContent = t("review");
+    review.onclick = function (event) {
+      var next = typedPay();
+      if (!next) {
+        event.preventDefault();
+        return;
+      }
+      review.href = next;
+    };
     if (phone) {
-      var review = document.createElement("a");
-      review.className = "b";
-      review.href = "#transfer";
-      review.dataset.i18n = "review";
-      review.textContent = t("review");
-      review.onclick = function (event) {
-        var next = typedPay();
-        if (!next) {
-          event.preventDefault();
-          return;
-        }
-        review.href = next;
-      };
       side.append(review);
     } else {
       var go = document.createElement("button");
@@ -2244,7 +2266,7 @@ function paintTransfer() {
           if (canvas) qrBox.replaceChildren(canvas);
         });
       };
-      side.append(go, hint, qrBox);
+      side.append(review, go, hint, qrBox);
     }
     var other = document.createElement("a");
     other.className = "b g";

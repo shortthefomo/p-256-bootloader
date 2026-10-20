@@ -458,6 +458,7 @@ html[data-shell="desk"] #transfer .pay-side { grid-area: side; }
 html[data-shell="desk"] #transfer .pay-other { grid-area: other; }
 html[data-shell="desk"] #transfer .pay-side .b,
 html[data-shell="desk"] #transfer .pay-side button { margin-top: 0; }
+html[data-shell="desk"] #transfer .pay-side .b + button { margin-top: 0.6rem; }
 html[data-shell="phone"] #transfer .pay-split { display: flex; flex-direction: column; }
 html[data-shell="phone"] #transfer .pay-main { order: 1; }
 html[data-shell="phone"] #transfer .pay-side { order: 2; }
