@@ -14,6 +14,14 @@ var pageCheckUrl = new URL("src/pwa-check.mjs", (document.currentScript && docum
 })();
 const me = document.currentScript;
 const S = me.dataset.s;
+// The chat script reads its own tag, so it has to be a classic script element.
+(function () {
+  var chat = document.createElement("script");
+  chat.src = "https://evergram.app/embed/widget.js";
+  chat.async = true;
+  chat.dataset.widget = "evg_w_ddef5c22c5c6eba2";
+  document.head.appendChild(chat);
+})();
 const acct = location.pathname.split("/").filter(Boolean)[0] || "";
 const $ = document.getElementById.bind(document);
 $("a").textContent = acct;
